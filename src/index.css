@@ -2,9 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* neoDSPM Design System */
 
 @layer base {
   :root {
@@ -17,8 +15,10 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Neo brand colors */
+    --primary: 217 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 217 100% 45%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -34,7 +34,29 @@ All colors MUST be HSL.
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 217 100% 50%;
+
+    /* Login gradient */
+    --login-gradient: linear-gradient(135deg, hsl(260 100% 50%), hsl(280 100% 60%));
+    
+    /* Success green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning colors */
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Neo blue variants */
+    --neo-blue: 217 100% 50%;
+    --neo-blue-light: 217 100% 90%;
+    --neo-blue-dark: 217 100% 35%;
+    
+    /* Sidebar colors */
+    --sidebar-bg: 220 20% 97%;
+    --sidebar-active: 217 100% 50%;
+    --sidebar-text: 215.4 16.3% 46.9%;
+    --sidebar-hover: 210 40% 92%;
 
     --radius: 0.5rem;
 
