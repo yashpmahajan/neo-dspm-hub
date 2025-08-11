@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import ApiKey from "./pages/ApiKey";
 import ResourceCreation from "./pages/ResourceCreation";
 import Report from "./pages/Report";
+import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -23,11 +24,9 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="api-key" element={<ApiKey />} />
-            <Route path="resource-creation" element={<ResourceCreation />} />
             <Route path="report" element={<Report />} />
             <Route path="support" element={<div className="p-6">Support page coming soon...</div>} />
-            <Route path="create-user" element={<div className="p-6">Create User page coming soon...</div>} />
+            <Route path="settings" element={<Settings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

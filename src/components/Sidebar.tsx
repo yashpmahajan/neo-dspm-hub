@@ -15,10 +15,9 @@ import { Button } from "./ui/button";
 
 const sidebarItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Key, label: "Set OpenAI API Key", path: "/api-key" },
   { icon: FileText, label: "Report", path: "/report" },
   { icon: HelpCircle, label: "Support", path: "/support" },
-  { icon: UserPlus, label: "Create User", path: "/create-user" },
+  { icon: Key, label: "Settings", path: "/settings" },
 ];
 
 const Sidebar = () => {
