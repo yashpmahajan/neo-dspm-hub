@@ -26,6 +26,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="report" element={<Report />} />
             <Route path="support" element={<div className="p-6">Support page coming soon...</div>} />
+            <Route path="api-key" element={<ApiKey />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

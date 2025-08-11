@@ -17,6 +17,7 @@ const sidebarItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: FileText, label: "Report", path: "/report" },
   { icon: HelpCircle, label: "Support", path: "/support" },
+  { icon: Key, label: "Set OpenAI API Key", path: "/api-key" },
   { icon: Key, label: "Settings", path: "/settings" },
 ];
 
