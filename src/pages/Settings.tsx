@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Key, Cloud } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { Key, Cloud, Shield, UserPlus } from "lucide-react";
 
 const Settings = () => {
   const [awsCredentials, setAwsCredentials] = useState({
@@ -15,6 +17,12 @@ const Settings = () => {
   });
 
   const [apiKey, setApiKey] = useState("");
+  const [newUser, setNewUser] = useState({
+    userId: "",
+    password: "",
+    isAdmin: false
+  });
+  const { toast } = useToast();
 
   const handleAwsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +36,36 @@ const Settings = () => {
     console.log("API Key saved:", apiKey);
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify(newUser)
+      });
+
+      if (response.ok) {
+        toast({
+          title: "User created successfully",
+          description: `User ${newUser.userId} has been created.`,
+        });
+        setNewUser({ userId: "", password: "", isAdmin: false });
+      } else {
+        throw new Error('Failed to create user');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -37,9 +75,10 @@ const Settings = () => {
 
       <div className="max-w-2xl">
         <Tabs defaultValue="aws" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="aws">AWS Configuration</TabsTrigger>
             <TabsTrigger value="api">API Configuration</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="aws">
@@ -134,6 +173,63 @@ const Settings = () => {
 
                   <Button type="submit" className="w-full">
                     Save API Configuration
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  User Management
+                </CardTitle>
+                <CardDescription>
+                  Create new users and manage user permissions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="userId">User ID</Label>
+                    <Input
+                      id="userId"
+                      type="text"
+                      value={newUser.userId}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, userId: e.target.value }))}
+                      placeholder="Enter user ID"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="userPassword">Password</Label>
+                    <Input
+                      id="userPassword"
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Enter password"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isAdmin"
+                      checked={newUser.isAdmin}
+                      onCheckedChange={(checked) => setNewUser(prev => ({ ...prev, isAdmin: !!checked }))}
+                    />
+                    <Label htmlFor="isAdmin" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Make this user an admin
+                    </Label>
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create User
                   </Button>
                 </form>
               </CardContent>
