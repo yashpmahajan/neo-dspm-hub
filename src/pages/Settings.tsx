@@ -78,7 +78,7 @@ const Settings = () => {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="aws">AWS Configuration</TabsTrigger>
             <TabsTrigger value="api">API Configuration</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="security">Add User</TabsTrigger>
           </TabsList>
 
           <TabsContent value="aws">
@@ -183,8 +183,8 @@ const Settings = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  User Management
+                  <UserPlus className="h-5 w-5 text-primary" />
+                  Add User
                 </CardTitle>
                 <CardDescription>
                   Create new users and manage user permissions.
