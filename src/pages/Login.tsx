@@ -7,13 +7,44 @@ import Logo from "@/components/Logo";
 import { Link } from "react-router-dom";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log("Login attempt:", { email, password });
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("YOUR_API_ENDPOINT/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          password: password,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Store authentication token/session
+        localStorage.setItem("authToken", data.token || "authenticated");
+        localStorage.setItem("userId", userId);
+        // Redirect to dashboard
+        window.location.href = "/";
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || "Invalid credentials");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -36,13 +67,13 @@ const Login = () => {
         <CardContent className="space-y-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="userId">User ID</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="userId"
+                type="text"
+                placeholder="Enter your user ID"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
                 required
               />
             </div>
@@ -59,8 +90,12 @@ const Login = () => {
               />
             </div>
             
-            <Button type="submit" className="w-full">
-              Login
+            {error && (
+              <div className="text-red-500 text-sm text-center">{error}</div>
+            )}
+            
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Logging in..." : "Login"}
             </Button>
           </form>
           

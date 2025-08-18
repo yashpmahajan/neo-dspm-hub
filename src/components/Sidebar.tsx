@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   Home, 
@@ -23,7 +23,14 @@ const sidebarItems = [
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userId");
+    navigate("/login");
+  };
 
   return (
     <div className={cn(
@@ -85,6 +92,7 @@ const Sidebar = () => {
             "w-full justify-start gap-3",
             isCollapsed && "px-2"
           )}
+          onClick={handleLogout}
         >
           <LogOut className="h-5 w-5" />
           {!isCollapsed && "Logout"}
