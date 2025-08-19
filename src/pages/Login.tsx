@@ -5,19 +5,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Logo from "@/components/Logo";
 import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
 
-    // try {
+    try {
       // const response = await fetch("YOUR_API_ENDPOINT/login", {
       //   method: "POST",
       //   headers: {
@@ -38,17 +38,33 @@ const Login = () => {
         // Store authentication token/session
         localStorage.setItem("authToken", data.token || "authenticated");
         localStorage.setItem("userId", userId);
+        
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${userId}!`,
+        });
+        
         // Redirect to dashboard
-        window.location.href = "/";
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1000);
       // } else {
       //   const errorData = await response.json();
-      //   setError(errorData.message || "Invalid credentials");
+      //   toast({
+      //     title: "Login failed",
+      //     description: errorData.message || "Invalid credentials",
+      //     variant: "destructive",
+      //   });
       // }
-    // } catch (error) {
-    //   setError("Network error. Please try again.");
-    // } finally {
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Network error. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    // }
+    }
   };
 
   return (
@@ -94,9 +110,6 @@ const Login = () => {
               />
             </div>
             
-            {error && (
-              <div className="text-red-500 text-sm text-center">{error}</div>
-            )}
             
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Logging in..." : "Login"}

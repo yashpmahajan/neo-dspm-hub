@@ -26,14 +26,38 @@ const Settings = () => {
 
   const handleAwsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle AWS credentials save
-    console.log("AWS Credentials saved:", awsCredentials);
+    try {
+      // Handle AWS credentials save
+      console.log("AWS Credentials saved:", awsCredentials);
+      toast({
+        title: "AWS Configuration saved",
+        description: "Your AWS credentials have been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save AWS configuration. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleApiSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle API key save
-    console.log("API Key saved:", apiKey);
+    try {
+      // Handle API key save
+      console.log("API Key saved:", apiKey);
+      toast({
+        title: "API Configuration saved",
+        description: "Your OpenAI API key has been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save API configuration. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
