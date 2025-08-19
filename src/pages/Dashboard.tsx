@@ -9,7 +9,8 @@ import {
   CheckCircle,
   XCircle,
   FileText,
-  Table
+  Table,
+  Code
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -63,6 +64,18 @@ Total Records: ${syntheticData.length}
     const element = document.createElement('a');
     element.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
     element.download = 'synthetic-data.csv';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const generateDataAsJSON = () => {
+    // Generate JSON format
+    const jsonData = JSON.stringify(syntheticData, null, 2);
+    
+    const element = document.createElement('a');
+    element.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonData);
+    element.download = 'synthetic-data.json';
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -133,12 +146,11 @@ Total Records: ${syntheticData.length}
                 {/* Export Options */}
                 <div className="space-y-2 pt-2 border-t">
                   <h4 className="font-medium text-sm">Export Options:</h4>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button 
                       onClick={generateDataAsPDF} 
                       variant="outline" 
-                      size="sm" 
-                      className="flex-1"
+                      size="sm"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       PDF
@@ -146,11 +158,18 @@ Total Records: ${syntheticData.length}
                     <Button 
                       onClick={generateDataAsCSV} 
                       variant="outline" 
-                      size="sm" 
-                      className="flex-1"
+                      size="sm"
                     >
                       <Table className="h-4 w-4 mr-2" />
                       CSV
+                    </Button>
+                    <Button 
+                      onClick={generateDataAsJSON} 
+                      variant="outline" 
+                      size="sm"
+                    >
+                      <Code className="h-4 w-4 mr-2" />
+                      JSON
                     </Button>
                   </div>
                 </div>
