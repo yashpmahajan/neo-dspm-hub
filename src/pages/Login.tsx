@@ -42,6 +42,7 @@ const Login = () => {
         toast({
           title: "Login successful",
           description: `Welcome back, ${userId}!`,
+          duration: 3000,
         });
         
         // Redirect to dashboard
@@ -54,6 +55,7 @@ const Login = () => {
       //     title: "Login failed",
       //     description: errorData.message || "Invalid credentials",
       //     variant: "destructive",
+      //     duration: 4000,
       //   });
       // }
     } catch (error) {
@@ -61,6 +63,7 @@ const Login = () => {
         title: "Error",
         description: "Network error. Please try again.",
         variant: "destructive",
+        duration: 4000,
       });
     } finally {
       setIsLoading(false);

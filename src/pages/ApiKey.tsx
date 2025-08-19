@@ -23,6 +23,7 @@ const ApiKey = () => {
         title: "Error",
         description: "Please enter a valid API key.",
         variant: "destructive",
+        duration: 4000,
       });
       return;
     }
@@ -32,12 +33,14 @@ const ApiKey = () => {
       toast({
         title: "Success",
         description: "API key saved successfully.",
+        duration: 3000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to save API key.",
         variant: "destructive",
+        duration: 4000,
       });
     }
   };
@@ -49,12 +52,14 @@ const ApiKey = () => {
       toast({
         title: "Success",
         description: "API key cleared successfully.",
+        duration: 3000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to clear API key.",
         variant: "destructive",
+        duration: 4000,
       });
     }
   };

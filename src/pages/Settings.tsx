@@ -32,12 +32,14 @@ const Settings = () => {
       toast({
         title: "AWS Configuration saved",
         description: "Your AWS credentials have been saved successfully.",
+        duration: 3000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to save AWS configuration. Please try again.",
         variant: "destructive",
+        duration: 4000,
       });
     }
   };
@@ -50,12 +52,14 @@ const Settings = () => {
       toast({
         title: "API Configuration saved",
         description: "Your OpenAI API key has been saved successfully.",
+        duration: 3000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to save API configuration. Please try again.",
         variant: "destructive",
+        duration: 4000,
       });
     }
   };
@@ -76,6 +80,7 @@ const Settings = () => {
         toast({
           title: "User created successfully",
           description: `User ${newUser.userId} has been created.`,
+          duration: 3000,
         });
         setNewUser({ userId: "", password: "", isAdmin: false });
       } else {
@@ -86,6 +91,7 @@ const Settings = () => {
         title: "Error",
         description: "Failed to create user. Please try again.",
         variant: "destructive",
+        duration: 4000,
       });
     }
   };
