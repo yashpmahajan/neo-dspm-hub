@@ -17,34 +17,38 @@ const Login = () => {
     setIsLoading(true);
     setError("");
 
-    try {
-      const response = await fetch("YOUR_API_ENDPOINT/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          password: password,
-        }),
-      });
+    // try {
+      // const response = await fetch("YOUR_API_ENDPOINT/login", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     user_id: userId,
+      //     password: password,
+      //   }),
+      // });
 
-      if (response.ok) {
-        const data = await response.json();
+      // if (response.ok) {
+        // const data = await response.json();
+        const data = {
+          token: "authenticated",
+          user_id: userId,
+        };
         // Store authentication token/session
         localStorage.setItem("authToken", data.token || "authenticated");
         localStorage.setItem("userId", userId);
         // Redirect to dashboard
         window.location.href = "/";
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || "Invalid credentials");
-      }
-    } catch (error) {
-      setError("Network error. Please try again.");
-    } finally {
+      // } else {
+      //   const errorData = await response.json();
+      //   setError(errorData.message || "Invalid credentials");
+      // }
+    // } catch (error) {
+    //   setError("Network error. Please try again.");
+    // } finally {
       setIsLoading(false);
-    }
+    // }
   };
 
   return (

@@ -7,7 +7,9 @@ import {
   Scan,
   Download,
   CheckCircle,
-  XCircle
+  XCircle,
+  FileText,
+  Table
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -22,6 +24,48 @@ const Dashboard = () => {
       { name: "Bob Johnson", email: "bob.johnson@email.com", phone: "(555) 456-7890", ssn: "***-**-9012" },
     ];
     setSyntheticData(mockData);
+  };
+
+  const generateDataAsPDF = () => {
+    // Simulate PDF generation
+    const pdfContent = `
+Data Security Report - Synthetic Data
+Generated on: ${new Date().toLocaleDateString()}
+
+Personal Information Generated:
+${syntheticData.map((item, index) => `
+${index + 1}. Name: ${item.name}
+   Email: ${item.email}
+   Phone: ${item.phone}
+   SSN: ${item.ssn}
+`).join('')}
+
+Total Records: ${syntheticData.length}
+    `;
+    
+    const element = document.createElement('a');
+    element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(pdfContent);
+    element.download = 'synthetic-data-report.pdf';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const generateDataAsCSV = () => {
+    // Generate CSV format
+    const csvHeader = "Name,Email,Phone,SSN\n";
+    const csvContent = syntheticData.map(item => 
+      `"${item.name}","${item.email}","${item.phone}","${item.ssn}"`
+    ).join('\n');
+    
+    const csvData = csvHeader + csvContent;
+    
+    const element = document.createElement('a');
+    element.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+    element.download = 'synthetic-data.csv';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   const uploadToS3 = () => {
@@ -73,17 +117,44 @@ const Dashboard = () => {
             </Button>
             
             {syntheticData.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Generated Data Preview:</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {syntheticData.map((item, index) => (
-                    <div key={index} className="text-xs p-2 bg-muted rounded">
-                      <div>{item.name} - {item.email}</div>
-                      <div>{item.phone} - {item.ssn}</div>
-                    </div>
-                  ))}
+              <>
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Generated Data Preview:</h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {syntheticData.map((item, index) => (
+                      <div key={index} className="text-xs p-2 bg-muted rounded">
+                        <div>{item.name} - {item.email}</div>
+                        <div>{item.phone} - {item.ssn}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+                
+                {/* Export Options */}
+                <div className="space-y-2 pt-2 border-t">
+                  <h4 className="font-medium text-sm">Export Options:</h4>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={generateDataAsPDF} 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      PDF
+                    </Button>
+                    <Button 
+                      onClick={generateDataAsCSV} 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                    >
+                      <Table className="h-4 w-4 mr-2" />
+                      CSV
+                    </Button>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
