@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+env/
+.env/
+*.sqlite3
+*.db
+*.log
+*.pot
+*.mo
+*.swp
+*.swo
+*.bak
+*.tmp
+*.~
+# Virtual environment
+venv/
+# Jupyter Notebook
+.ipynb_checkpoints
+# VS Code
+.vscode/
+# OS
+.DS_Store
+Thumbs.db
+# Generated files
+app/generated_files/

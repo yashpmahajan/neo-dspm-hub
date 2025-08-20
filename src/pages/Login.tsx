@@ -12,52 +12,50 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      // const response = await fetch("YOUR_API_ENDPOINT/login", {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //   },
-      //   body: JSON.stringify({
-      //     user_id: userId,
-      //     password: password,
-      //   }),
-      // });
+    const formdata = new FormData();
+    formdata.append("username", userId);
+    formdata.append("password", password);
 
-      // if (response.ok) {
-        // const data = await response.json();
-        const data = {
-          token: "authenticated",
-          user_id: userId,
-        };
-        // Store authentication token/session
-        localStorage.setItem("authToken", data.token || "authenticated");
-        localStorage.setItem("userId", userId);
-        
+    const requestOptions: RequestInit = {
+      method: "POST",
+      body: formdata,
+      redirect: "follow",
+    };
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/login", requestOptions);
+      const result = await response.text();
+
+      if (response.ok) {
         toast({
           title: "Login successful",
-          description: `Welcome back, ${userId}!`,
+          description: "Welcome back!",
           duration: 3000,
         });
-        
-        // Redirect to dashboard
+        // Try to parse result as JSON for token/userId storage
+        try {
+          const data = JSON.parse(result);
+          localStorage.setItem("authToken", data.access_token || "authenticated");
+          localStorage.setItem("userId", data.userId);
+        } catch {
+          // If not JSON, just log result
+          console.log("Login successful:", result);
+        }
         setTimeout(() => {
           window.location.href = "/";
         }, 1000);
-      // } else {
-      //   const errorData = await response.json();
-      //   toast({
-      //     title: "Login failed",
-      //     description: errorData.message || "Invalid credentials",
-      //     variant: "destructive",
-      //     duration: 4000,
-      //   });
-      // }
+      } else {
+        toast({
+          title: "Login failed",
+          description: result || "Invalid credentials",
+          variant: "destructive",
+          duration: 4000,
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",

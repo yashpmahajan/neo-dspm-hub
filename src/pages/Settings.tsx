@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,14 @@ const Settings = () => {
     bucketName: ""
   });
 
+  useEffect(() => {
+      // Load existing API key from localStorage
+      const savedKey = JSON.parse(localStorage.getItem("aws_credentials") as string)
+      if (savedKey) {
+        setAwsCredentials(savedKey);
+      }
+    }, []);
+
   const [apiKey, setApiKey] = useState("");
   const [newUser, setNewUser] = useState({
     userId: "",
@@ -28,7 +36,7 @@ const Settings = () => {
     e.preventDefault();
     try {
       // Handle AWS credentials save
-      console.log("AWS Credentials saved:", awsCredentials);
+      localStorage.setItem("aws_credentials", JSON.stringify(awsCredentials));
       toast({
         title: "AWS Configuration saved",
         description: "Your AWS credentials have been saved successfully.",
@@ -67,14 +75,24 @@ const Settings = () => {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
-        body: JSON.stringify(newUser)
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+
+      const raw = JSON.stringify({
+        username: newUser.userId,
+        password: newUser.password,
+        name: newUser.userId,
+        is_admin: newUser.isAdmin
       });
+
+      const requestOptions: RequestInit = {
+        method: "POST",
+        headers: myHeaders,
+        body: raw,
+        redirect: "follow" as RequestRedirect
+      };
+
+      const response = await fetch("http://127.0.0.1:8000/create-user", requestOptions);
 
       if (response.ok) {
         toast({
@@ -105,9 +123,8 @@ const Settings = () => {
 
       <div className="max-w-2xl">
         <Tabs defaultValue="aws" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="aws">AWS Configuration</TabsTrigger>
-            <TabsTrigger value="api">API Configuration</TabsTrigger>
             <TabsTrigger value="security">Add User</TabsTrigger>
           </TabsList>
 
@@ -174,41 +191,6 @@ const Settings = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="api">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5 text-primary" />
-                  API Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure your OpenAI API key for enhanced data processing capabilities.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleApiSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="apiKey">OpenAI API Key</Label>
-                    <Input
-                      id="apiKey"
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-..."
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Your API key is stored securely and only used for processing requests.
-                    </p>
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    Save API Configuration
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="security">
             <Card>
               <CardHeader>
@@ -217,7 +199,7 @@ const Settings = () => {
                   Add User
                 </CardTitle>
                 <CardDescription>
-                  Create new users and manage user permissions.
+                  Create new users
                 </CardDescription>
               </CardHeader>
               <CardContent>

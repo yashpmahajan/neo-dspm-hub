@@ -17,6 +17,7 @@ const Dashboard = () => {
   const [syntheticData, setSyntheticData] = useState<any[]>([]);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scanResults, setScanResults] = useState<string | null>(null);
+  const [generateDataBtnDisabled, setGenerateDataBtnDisabled] = useState(false);
 
   const generateSyntheticData = () => {
     const mockData = [
@@ -108,10 +109,14 @@ Total Records: ${syntheticData.length}
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Data Security Posture Management</h1>
-        <p className="text-muted-foreground mt-2">Follow the workflow from left to right, top to bottom</p>
+        <h1 className="text-3xl font-bold text-foreground">
+          Data Security Posture Management
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Follow the workflow from left to right, top to bottom
+        </p>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl">
         {/* Generate Synthetic Data */}
         <Card className="h-fit">
@@ -125,47 +130,41 @@ Total Records: ${syntheticData.length}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={generateSyntheticData} className="w-full">
+            {/* <Button onClick={generateSyntheticData} className="w-full">
+              Generate Data
+            </Button> */}
+            <Button
+              onClick={() => setGenerateDataBtnDisabled(true)}
+              className="w-full"
+            >
               Generate Data
             </Button>
-            
-            {syntheticData.length > 0 && (
+
+            {generateDataBtnDisabled && (
               <>
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm">Generated Data Preview:</h4>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {syntheticData.map((item, index) => (
-                      <div key={index} className="text-xs p-2 bg-muted rounded">
-                        <div>{item.name} - {item.email}</div>
-                        <div>{item.phone} - {item.ssn}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
                 {/* Export Options */}
                 <div className="space-y-2 pt-2 border-t">
                   <h4 className="font-medium text-sm">Export Options:</h4>
                   <div className="grid grid-cols-3 gap-2">
-                    <Button 
-                      onClick={generateDataAsPDF} 
-                      variant="outline" 
+                    <Button
+                      onClick={generateSyntheticData}
+                      variant="outline"
                       size="sm"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       PDF
                     </Button>
-                    <Button 
-                      onClick={generateDataAsCSV} 
-                      variant="outline" 
+                    <Button
+                      onClick={generateSyntheticData}
+                      variant="outline"
                       size="sm"
                     >
                       <Table className="h-4 w-4 mr-2" />
                       CSV
                     </Button>
-                    <Button 
-                      onClick={generateDataAsJSON} 
-                      variant="outline" 
+                    <Button
+                      onClick={generateSyntheticData}
+                      variant="outline"
                       size="sm"
                     >
                       <Code className="h-4 w-4 mr-2" />
@@ -173,6 +172,28 @@ Total Records: ${syntheticData.length}
                     </Button>
                   </div>
                 </div>
+                {syntheticData.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">
+                      Generated Data Preview:
+                    </h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {syntheticData.map((item, index) => (
+                        <div
+                          key={index}
+                          className="text-xs p-2 bg-muted rounded"
+                        >
+                          <div>
+                            {item.name} - {item.email}
+                          </div>
+                          <div>
+                            {item.phone} - {item.ssn}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -190,25 +211,27 @@ Total Records: ${syntheticData.length}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={uploadToS3} 
+            <Button
+              onClick={uploadToS3}
               className="w-full"
               disabled={syntheticData.length === 0}
             >
               Upload to Cloud
             </Button>
-            
-            {uploadStatus === 'success' && (
+
+            {uploadStatus === "success" && (
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm">Upload successful!</span>
               </div>
             )}
-            
-            {uploadStatus === 'error' && (
+
+            {uploadStatus === "error" && (
               <div className="flex items-center gap-2 text-red-600">
                 <XCircle className="h-4 w-4" />
-                <span className="text-sm">Upload failed. Please try again.</span>
+                <span className="text-sm">
+                  Upload failed. Please try again.
+                </span>
               </div>
             )}
           </CardContent>
@@ -226,14 +249,14 @@ Total Records: ${syntheticData.length}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={runPIIScan} 
+            <Button
+              onClick={runPIIScan}
               className="w-full"
-              disabled={uploadStatus !== 'success'}
+              disabled={uploadStatus !== "success"}
             >
               Run Scan
             </Button>
-            
+
             {scanResults && (
               <div className="p-3 bg-muted rounded">
                 <h4 className="font-medium text-sm mb-1">Scan Results:</h4>
@@ -255,8 +278,8 @@ Total Records: ${syntheticData.length}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={downloadReport} 
+            <Button
+              onClick={downloadReport}
               className="w-full"
               disabled={!scanResults}
             >

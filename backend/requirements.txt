@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pymongo
+pydantic
+python-dotenv
+python-multipart
+fpdf
+boto3
+PyJWT
