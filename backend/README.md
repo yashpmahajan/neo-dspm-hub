@@ -31,6 +31,7 @@ backend/
 
 2. (Recommended) Create a Python virtual environment:
   ```powershell
+  cd .\backend
   python -m venv venv
   .\venv\Scripts\activate
   ```
