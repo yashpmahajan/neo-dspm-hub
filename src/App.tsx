@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ConnectAdmin from "./pages/ConnectAdmin";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<ConnectAdmin />} />
+          <Route path="/contact" element={<ConnectAdmin />} />
           <Route path="/" element={
             <ProtectedRoute>
               <DashboardLayout />
