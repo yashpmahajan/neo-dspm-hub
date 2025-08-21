@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Database, 
   Upload, 
@@ -10,7 +11,8 @@ import {
   XCircle,
   FileText,
   Table,
-  Code
+  Code,
+  Loader2
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -18,6 +20,19 @@ const Dashboard = () => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scanResults, setScanResults] = useState<string | null>(null);
   const [generateDataBtnDisabled, setGenerateDataBtnDisabled] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
+  const { toast } = useToast();
+
+  // Get auth token from localStorage
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("authToken");
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
 
   const generateSyntheticData = () => {
     const mockData = [
@@ -28,65 +43,92 @@ const Dashboard = () => {
     setSyntheticData(mockData);
   };
 
-  const generateDataAsPDF = () => {
-    // Simulate PDF generation
-    const pdfContent = `
-Data Security Report - Synthetic Data
-Generated on: ${new Date().toLocaleDateString()}
+  // Generate data using backend API
+  const generateDataFile = async (filetype: 'pdf' | 'csv' | 'json') => {
+    setIsGenerating(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`http://127.0.0.1:8000/generatedata?filetype=${filetype}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-Personal Information Generated:
-${syntheticData.map((item, index) => `
-${index + 1}. Name: ${item.name}
-   Email: ${item.email}
-   Phone: ${item.phone}
-   SSN: ${item.ssn}
-`).join('')}
-
-Total Records: ${syntheticData.length}
-    `;
-    
-    const element = document.createElement('a');
-    element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(pdfContent);
-    element.download = 'synthetic-data-report.pdf';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+      if (response.ok) {
+        // Download the file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `data.${filetype}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        toast({
+          title: "File generated successfully",
+          description: `${filetype.toUpperCase()} file has been downloaded`,
+        });
+      } else {
+        throw new Error('Failed to generate file');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to generate ${filetype.toUpperCase()} file`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const generateDataAsCSV = () => {
-    // Generate CSV format
-    const csvHeader = "Name,Email,Phone,SSN\n";
-    const csvContent = syntheticData.map(item => 
-      `"${item.name}","${item.email}","${item.phone}","${item.ssn}"`
-    ).join('\n');
-    
-    const csvData = csvHeader + csvContent;
-    
-    const element = document.createElement('a');
-    element.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
-    element.download = 'synthetic-data.csv';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
+  const generateDataAsPDF = () => generateDataFile('pdf');
+  const generateDataAsCSV = () => generateDataFile('csv');
+  const generateDataAsJSON = () => generateDataFile('json');
 
-  const generateDataAsJSON = () => {
-    // Generate JSON format
-    const jsonData = JSON.stringify(syntheticData, null, 2);
+  // Upload to S3 using backend API  
+  const uploadToS3 = async (filetype: 'pdf' | 'csv' | 'json') => {
+    setIsUploading(true);
+    setUploadStatus('idle');
     
-    const element = document.createElement('a');
-    element.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonData);
-    element.download = 'synthetic-data.json';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
+    try {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+      formData.append('filetype', filetype);
+      
+      const response = await fetch('http://127.0.0.1:8000/uploadtobucket', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-  const uploadToS3 = () => {
-    // Simulate upload process
-    setTimeout(() => {
-      setUploadStatus(Math.random() > 0.2 ? 'success' : 'error');
-    }, 1500);
+      const result = await response.json();
+      
+      if (response.ok) {
+        setUploadStatus('success');
+        setUploadedFileUrl(result.file_url);
+        toast({
+          title: "Upload successful",
+          description: `${filetype.toUpperCase()} file uploaded to S3`,
+        });
+      } else {
+        throw new Error(result.detail || 'Upload failed');
+      }
+    } catch (error) {
+      setUploadStatus('error');
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const runPIIScan = () => {
@@ -147,27 +189,30 @@ Total Records: ${syntheticData.length}
                   <h4 className="font-medium text-sm">Export Options:</h4>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
-                      onClick={generateSyntheticData}
+                      onClick={generateDataAsPDF}
                       variant="outline"
                       size="sm"
+                      disabled={isGenerating}
                     >
-                      <FileText className="h-4 w-4 mr-2" />
+                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
                       PDF
                     </Button>
                     <Button
-                      onClick={generateSyntheticData}
+                      onClick={generateDataAsCSV}
                       variant="outline"
                       size="sm"
+                      disabled={isGenerating}
                     >
-                      <Table className="h-4 w-4 mr-2" />
+                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Table className="h-4 w-4 mr-2" />}
                       CSV
                     </Button>
                     <Button
-                      onClick={generateSyntheticData}
+                      onClick={generateDataAsJSON}
                       variant="outline"
                       size="sm"
+                      disabled={isGenerating}
                     >
-                      <Code className="h-4 w-4 mr-2" />
+                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
                       JSON
                     </Button>
                   </div>
@@ -211,18 +256,51 @@ Total Records: ${syntheticData.length}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              onClick={uploadToS3}
-              className="w-full"
-              disabled={syntheticData.length === 0}
-            >
-              Upload to Cloud
-            </Button>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground mb-2">Select file type to upload:</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  onClick={() => uploadToS3('pdf')}
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploading}
+                >
+                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                  PDF
+                </Button>
+                <Button
+                  onClick={() => uploadToS3('csv')}
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploading}
+                >
+                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Table className="h-4 w-4 mr-2" />}
+                  CSV
+                </Button>
+                <Button
+                  onClick={() => uploadToS3('json')}
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploading}
+                >
+                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
+                  JSON
+                </Button>
+              </div>
+            </div>
 
             {uploadStatus === "success" && (
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm">Upload successful!</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">Upload successful!</span>
+                </div>
+                {uploadedFileUrl && (
+                  <div className="p-2 bg-muted rounded text-xs">
+                    <p className="font-medium">File URL:</p>
+                    <p className="break-all">{uploadedFileUrl}</p>
+                  </div>
+                )}
               </div>
             )}
 
