@@ -110,14 +110,12 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem("authToken");
       const formData = new FormData();
-      formData.append('filetype', filetype);
       
       const response = await fetch('http://127.0.0.1:8000/uploadtobucket', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-        body: formData,
       });
 
       const result = await response.json();

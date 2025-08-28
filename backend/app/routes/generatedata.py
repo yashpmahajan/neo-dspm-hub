@@ -49,16 +49,26 @@ def generate_data(
         raise HTTPException(status_code=400, detail="Invalid file type")
     # Return file
     return FileResponse(filename, media_type="application/octet-stream", filename=os.path.basename(filename))
+    
+# Upload generated file to a new AWS S3 bucket with timestamp in name, then upload file in userID folder
+from datetime import datetime
 
-# Upload generated file to AWS S3 in userID folder
+
 @router.post("/uploadtobucket")
 def upload_to_bucket(
-    filetype: str = Form(..., regex="^(json|pdf|csv)$"),
     current_user: dict = Depends(get_current_user)
 ):
-    filename = os.path.join(SAVE_DIR, f"data.{filetype}")
-    if not os.path.exists(filename):
-        raise HTTPException(status_code=404, detail="File not found. Please generate the file first.")
+    # Auto-detect filetype from available files
+    filetype = None
+    filename = None
+    for ext in ["json", "pdf", "csv"]:
+        test_path = os.path.join(SAVE_DIR, f"data.{ext}")
+        if os.path.exists(test_path):
+            filetype = ext
+            filename = test_path
+            break
+    if not filetype or not filename:
+        raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
 
     # Get user id from DB
     user = users_collection.find_one({"username": current_user["username"]})
@@ -67,12 +77,10 @@ def upload_to_bucket(
     user_id = str(user["_id"])
 
     # AWS credentials from ENV
-    import os
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
     AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME]):
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
         raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
 
     s3 = boto3.client(
@@ -82,13 +90,29 @@ def upload_to_bucket(
         region_name=AWS_REGION
     )
 
+    # Create bucket name with timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    bucket_name = f"neo-bucket-{timestamp}"
+
+    # Create bucket
+    try:
+        if AWS_REGION == "us-east-1":
+            s3.create_bucket(Bucket=bucket_name)
+        else:
+            s3.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": AWS_REGION}
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create bucket: {e}")
+
     # S3 key: userID/data.filetype
     s3_key = f"{user_id}/data.{filetype}"
 
     try:
-        s3.upload_file(filename, AWS_BUCKET_NAME, s3_key)
+        s3.upload_file(filename, bucket_name, s3_key)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to S3: {e}")
 
-    file_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
-    return {"msg": "File uploaded successfully", "file_url": file_url}
+    file_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+    return {"msg": "File uploaded successfully", "bucket_name": bucket_name, "file_url": file_url}
