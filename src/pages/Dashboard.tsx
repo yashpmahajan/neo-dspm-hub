@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -36,6 +39,12 @@ const Dashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [showScanForm, setShowScanForm] = useState(false);
+  const [scanFormData, setScanFormData] = useState({
+    bearerToken: '',
+    scanDataCurl: '',
+    inventoryDataCurl: ''
+  });
   const { toast } = useToast();
 
   // Get auth token from localStorage
@@ -149,6 +158,38 @@ const Dashboard = () => {
     }, 2000);
   };
 
+  const showScanFormHandler = () => {
+    setShowScanForm(true);
+  };
+
+  const handleScanFormSubmit = () => {
+    // Validate all fields are filled
+    if (!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Run the actual scan (placeholder for now)
+    setTimeout(() => {
+      setScanResults("Found: 3 emails, 3 phone numbers, 3 SSNs");
+      toast({
+        title: "Scan completed",
+        description: "PII scan has been completed successfully",
+      });
+    }, 2000);
+  };
+
+  const handleScanFormChange = (field: string, value: string) => {
+    setScanFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   const downloadReport = () => {
     // Simulate report download
     const element = document.createElement('a');
@@ -168,6 +209,12 @@ const Dashboard = () => {
     setIsGenerating(false);
     setIsUploading(false);
     setUploadedFileUrl('');
+    setShowScanForm(false);
+    setScanFormData({
+      bearerToken: '',
+      scanDataCurl: '',
+      inventoryDataCurl: ''
+    });
     setIsResetDialogOpen(false);
     
     toast({
@@ -319,20 +366,20 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Run PII Scan */}
+        {/* Run Scan */}
         <Card className="h-fit">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Scan className="h-6 w-6 text-primary" />
-              Run PII Scan
+              Run Scan
             </CardTitle>
             <CardDescription>
-              Scan uploaded file for sensitive data patterns.
+              Configure and run scan for sensitive data patterns.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
-              onClick={runPIIScan}
+              onClick={showScanFormHandler}
               className="w-full"
               disabled={uploadStatus !== "success"}
             >
@@ -347,6 +394,61 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Scan Configuration Form - appears when Run Scan is clicked */}
+        {showScanForm && (
+          <Card className="h-fit lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-6 w-6 text-primary" />
+                Scan Configuration
+              </CardTitle>
+              <CardDescription>
+                Configure the scan parameters before running.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bearerToken">Bearer Token *</Label>
+                  <Input
+                    id="bearerToken"
+                    placeholder="Enter your bearer token"
+                    value={scanFormData.bearerToken}
+                    onChange={(e) => handleScanFormChange('bearerToken', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="scanDataCurl">Curl Command for Scan Data *</Label>
+                  <Textarea
+                    id="scanDataCurl"
+                    placeholder="Enter curl command for scan data"
+                    value={scanFormData.scanDataCurl}
+                    onChange={(e) => handleScanFormChange('scanDataCurl', e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inventoryDataCurl">Curl Command for Fetching Inventory Data *</Label>
+                <Textarea
+                  id="inventoryDataCurl"
+                  placeholder="Enter curl command for fetching inventory data"
+                  value={scanFormData.inventoryDataCurl}
+                  onChange={(e) => handleScanFormChange('inventoryDataCurl', e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <Button
+                onClick={handleScanFormSubmit}
+                className="w-full"
+                disabled={!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()}
+              >
+                Run Scan
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Download Report */}
         <Card className="h-fit">
