@@ -381,7 +381,6 @@ const Dashboard = () => {
             <Button
               onClick={showScanFormHandler}
               className="w-full"
-              disabled={uploadStatus !== "success"}
             >
               Run Scan
             </Button>
@@ -465,7 +464,6 @@ const Dashboard = () => {
             <Button
               onClick={downloadReport}
               className="w-full"
-              disabled={!scanResults}
             >
               Download Report
             </Button>
