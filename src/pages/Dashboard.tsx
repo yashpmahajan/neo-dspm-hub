@@ -256,38 +256,14 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground mb-2">Select file type to upload:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  onClick={() => uploadToS3('pdf')}
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploading}
-                >
-                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  PDF
-                </Button>
-                <Button
-                  onClick={() => uploadToS3('csv')}
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploading}
-                >
-                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Table className="h-4 w-4 mr-2" />}
-                  CSV
-                </Button>
-                <Button
-                  onClick={() => uploadToS3('json')}
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploading}
-                >
-                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
-                  JSON
-                </Button>
-              </div>
-            </div>
+            <Button
+              onClick={() => uploadToS3('pdf')}
+              className="w-full"
+              disabled={isUploading}
+            >
+              {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Upload
+            </Button>
 
             {uploadStatus === "success" && (
               <div className="space-y-2">
