@@ -378,12 +378,67 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              onClick={showScanFormHandler}
-              className="w-full"
-            >
-              Run Scan
-            </Button>
+            {!showScanForm ? (
+              <Button
+                onClick={showScanFormHandler}
+                className="w-full"
+              >
+                Run Scan
+              </Button>
+            ) : (
+              <>
+                {/* Scan Configuration Form */}
+                <div className="space-y-4 pt-2 border-t">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bearerToken">Bearer Token *</Label>
+                      <Input
+                        id="bearerToken"
+                        placeholder="Enter your bearer token"
+                        value={scanFormData.bearerToken}
+                        onChange={(e) => handleScanFormChange('bearerToken', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="scanDataCurl">Curl Command for Scan Data *</Label>
+                      <Textarea
+                        id="scanDataCurl"
+                        placeholder="Enter curl command for scan data"
+                        value={scanFormData.scanDataCurl}
+                        onChange={(e) => handleScanFormChange('scanDataCurl', e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inventoryDataCurl">Curl Command for Fetching Inventory Data *</Label>
+                      <Textarea
+                        id="inventoryDataCurl"
+                        placeholder="Enter curl command for fetching inventory data"
+                        value={scanFormData.inventoryDataCurl}
+                        onChange={(e) => handleScanFormChange('inventoryDataCurl', e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setShowScanForm(false)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleScanFormSubmit}
+                      className="flex-1"
+                      disabled={!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()}
+                    >
+                      Run Scan
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {scanResults && (
               <div className="p-3 bg-muted rounded">
@@ -393,61 +448,6 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Scan Configuration Form - appears when Run Scan is clicked */}
-        {showScanForm && (
-          <Card className="h-fit lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-6 w-6 text-primary" />
-                Scan Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure the scan parameters before running.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bearerToken">Bearer Token *</Label>
-                  <Input
-                    id="bearerToken"
-                    placeholder="Enter your bearer token"
-                    value={scanFormData.bearerToken}
-                    onChange={(e) => handleScanFormChange('bearerToken', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="scanDataCurl">Curl Command for Scan Data *</Label>
-                  <Textarea
-                    id="scanDataCurl"
-                    placeholder="Enter curl command for scan data"
-                    value={scanFormData.scanDataCurl}
-                    onChange={(e) => handleScanFormChange('scanDataCurl', e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inventoryDataCurl">Curl Command for Fetching Inventory Data *</Label>
-                <Textarea
-                  id="inventoryDataCurl"
-                  placeholder="Enter curl command for fetching inventory data"
-                  value={scanFormData.inventoryDataCurl}
-                  onChange={(e) => handleScanFormChange('inventoryDataCurl', e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
-              <Button
-                onClick={handleScanFormSubmit}
-                className="w-full"
-                disabled={!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()}
-              >
-                Run Scan
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Download Report */}
         <Card className="h-fit">
