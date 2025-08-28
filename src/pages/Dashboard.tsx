@@ -2,6 +2,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   Database, 
   Upload, 
@@ -12,7 +23,8 @@ import {
   FileText,
   Table,
   Code,
-  Loader2
+  Loader2,
+  RotateCcw
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -23,6 +35,7 @@ const Dashboard = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Get auth token from localStorage
@@ -146,6 +159,23 @@ const Dashboard = () => {
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+  };
+
+  const resetConfiguration = () => {
+    // Clear all UI state
+    setSyntheticData([]);
+    setUploadStatus('idle');
+    setScanResults(null);
+    setGenerateDataBtnDisabled(false);
+    setIsGenerating(false);
+    setIsUploading(false);
+    setUploadedFileUrl('');
+    setIsResetDialogOpen(false);
+    
+    toast({
+      title: "Configuration reset",
+      description: "All configurations and progress have been cleared",
+    });
   };
 
   return (
@@ -341,6 +371,32 @@ const Dashboard = () => {
             </Button>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Reset Configuration Button */}
+      <div className="mt-8 flex justify-center max-w-6xl">
+        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Reset Configuration
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Configuration</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to reset all configurations and progress? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={resetConfiguration}>
+                Yes, Reset
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
