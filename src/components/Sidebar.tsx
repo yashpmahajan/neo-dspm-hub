@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { 
   Home, 
@@ -24,12 +25,24 @@ const sidebarItems = [
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("userId");
-    navigate("/login");
+    // Clear all localStorage data
+    localStorage.clear();
+    
+    // Clear all sessionStorage data
+    sessionStorage.clear();
+    
+    // Clear React Query cache
+    queryClient.clear();
+    
+    // Navigate to login and replace the current entry in history
+    navigate("/login", { replace: true });
+    
+    // Force page reload to ensure all cache is cleared
+    window.location.reload();
   };
 
   return (
