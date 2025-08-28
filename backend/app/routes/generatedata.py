@@ -18,12 +18,17 @@ DATA = [
 SAVE_DIR = "app/generated_files"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-
 @router.get("/generatedata")
 def generate_data(
     filetype: str = Query(..., enum=["json", "pdf", "csv"]),
     current_user: dict = Depends(get_current_user)
 ):
+    # Clear existing files in SAVE_DIR
+    for f in os.listdir(SAVE_DIR):
+        file_path = os.path.join(SAVE_DIR, f)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
     filename = os.path.join(SAVE_DIR, f"data.{filetype}")
     # Create file
     if filetype == "json":
@@ -49,7 +54,6 @@ def generate_data(
         raise HTTPException(status_code=400, detail="Invalid file type")
     # Return file
     return FileResponse(filename, media_type="application/octet-stream", filename=os.path.basename(filename))
-    
 # Upload generated file to a new AWS S3 bucket with timestamp in name, then upload file in userID folder
 from datetime import datetime
 
@@ -116,3 +120,33 @@ def upload_to_bucket(
 
     file_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
     return {"msg": "File uploaded successfully", "bucket_name": bucket_name, "file_url": file_url}
+
+# Delete an AWS S3 bucket by name
+@router.delete("/deletebucket")
+def delete_bucket(bucket_name: str = Query(...), current_user: dict = Depends(get_current_user)):
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+        raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
+
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_REGION
+    )
+
+    # First, delete all objects in the bucket
+    try:
+        # List objects in the bucket
+        objects = s3.list_objects_v2(Bucket=bucket_name)
+        if 'Contents' in objects:
+            for obj in objects['Contents']:
+                s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+        # Delete the bucket
+        s3.delete_bucket(Bucket=bucket_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete bucket: {e}")
+
+    return {"msg": f"Bucket '{bucket_name}' deleted successfully."}
