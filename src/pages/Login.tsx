@@ -27,7 +27,14 @@ const Login = () => {
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/login", requestOptions);
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) {
+        throw new Error("Backend API URL is not defined. Please set VITE_BACKEND_API in your .env file.");
+      }
+      const response = await fetch(
+        `${backendUrl}/login`,
+        requestOptions
+      );
       const result = await response.text();
 
       if (response.ok) {

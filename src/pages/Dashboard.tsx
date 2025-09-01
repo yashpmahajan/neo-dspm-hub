@@ -70,11 +70,12 @@ const Dashboard = () => {
     setIsGenerating(true);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`http://127.0.0.1:8000/generatedata?filetype=${filetype}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const backendApi = import.meta.env.VITE_BACKEND_API;
+      const response = await fetch(`${backendApi}/generatedata?filetype=${filetype}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
       });
 
       if (response.ok) {
@@ -120,7 +121,8 @@ const Dashboard = () => {
       const token = localStorage.getItem("authToken");
       const formData = new FormData();
       
-      const response = await fetch('http://127.0.0.1:8000/uploadtobucket', {
+      const backendApi = import.meta.env.VITE_BACKEND_API;
+      const response = await fetch(`${backendApi}/uploadtobucket`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
