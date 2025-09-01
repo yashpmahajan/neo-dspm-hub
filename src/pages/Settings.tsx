@@ -92,7 +92,7 @@ const Settings = () => {
         redirect: "follow" as RequestRedirect
       };
 
-      const response = await fetch("http://127.0.0.1:8000/create-user", requestOptions);
+      const response = await fetch("/api/create-user", requestOptions);
 
       if (response.ok) {
         toast({
