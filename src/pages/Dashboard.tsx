@@ -192,14 +192,31 @@ const Dashboard = () => {
     }));
   };
 
-  const downloadReport = () => {
-    // Simulate report download
-    const element = document.createElement('a');
-    element.href = 'data:text/plain;charset=utf-8,PII Scan Report\nGenerated Data Security Report\n\nFound sensitive data patterns:\n- 3 email addresses\n- 3 phone numbers\n- 3 SSN patterns';
-    element.download = 'pii-scan-report.txt';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+  const downloadReport = async () => {
+    try {
+      const baseUrl = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+      const res = await fetch(`${baseUrl}/download/report`, { method: 'GET' })
+      if (!res.ok) {
+        throw new Error(`Failed to download report: ${res.status}`)
+      }
+      const blob = await res.blob()
+      let filename = 'dspm_validation_report.pdf'
+      const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition')
+      if (cd) {
+        const m = cd.match(/filename="?([^";]+)"?/i)
+        if (m && m[1]) filename = m[1]
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+    }
   };
 
   const resetConfiguration = () => {
