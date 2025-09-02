@@ -122,7 +122,7 @@ const Dashboard = () => {
       const formData = new FormData();
       
       const backendApi = import.meta.env.VITE_BACKEND_API;
-      const response = await fetch(`${backendApi}/uploadtobucket`, {
+      const response = await fetch(`${backendApi}/upload-env-bucket`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

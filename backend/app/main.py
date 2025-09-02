@@ -6,6 +6,7 @@ from app.routes import secretStorage
 from app.logging_config import setup_route_logging
 import logging
 from app.logging_config import get_logger
+from app.routes import upload_to_env_bucket
 
 # Setup logging for all routes
 setup_route_logging()
@@ -49,6 +50,9 @@ app.include_router(user.router)
 app.include_router(generatedata.router)
 app.include_router(secretStorage.router)
 app.include_router(data_scan.router)
+app.include_router(upload_to_env_bucket.router)
+
+
 
 # Log all registered routes
 @app.on_event("startup")
