@@ -41,9 +41,9 @@ const Dashboard = () => {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [showScanForm, setShowScanForm] = useState(false);
   const [scanFormData, setScanFormData] = useState({
-    bearerToken: '',
-    scanDataCurl: '',
-    inventoryDataCurl: ''
+    bearerTokenCurl: '',
+    scanTriggerCurl: '',
+    clientResultCurl: ''
   });
   const { toast } = useToast();
 
@@ -166,7 +166,7 @@ const Dashboard = () => {
 
   const handleScanFormSubmit = () => {
     // Validate all fields are filled
-    if (!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()) {
+    if (!scanFormData.bearerTokenCurl.trim() || !scanFormData.scanTriggerCurl.trim() || !scanFormData.clientResultCurl.trim()) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -213,9 +213,9 @@ const Dashboard = () => {
     setUploadedFileUrl('');
     setShowScanForm(false);
     setScanFormData({
-      bearerToken: '',
-      scanDataCurl: '',
-      inventoryDataCurl: ''
+      bearerTokenCurl: '',
+      scanTriggerCurl: '',
+      clientResultCurl: ''
     });
     setIsResetDialogOpen(false);
     
@@ -393,31 +393,32 @@ const Dashboard = () => {
                 <div className="space-y-4 pt-2 border-t">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="bearerToken">Bearer Token *</Label>
-                      <Input
-                        id="bearerToken"
-                        placeholder="Enter your bearer token"
-                        value={scanFormData.bearerToken}
-                        onChange={(e) => handleScanFormChange('bearerToken', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="scanDataCurl">Curl Command for Scan Data *</Label>
+                      <Label htmlFor="bearerTokenCurl">Curl Command 1 *</Label>
                       <Textarea
-                        id="scanDataCurl"
-                        placeholder="Enter curl command for scan data"
-                        value={scanFormData.scanDataCurl}
-                        onChange={(e) => handleScanFormChange('scanDataCurl', e.target.value)}
+                        id="bearerTokenCurl"
+                        placeholder="Enter curl command 1"
+                        value={scanFormData.bearerTokenCurl}
+                        onChange={(e) => handleScanFormChange('bearerTokenCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="inventoryDataCurl">Curl Command for Fetching Inventory Data *</Label>
+                      <Label htmlFor="scanTriggerCurl">Curl Command 2 *</Label>
                       <Textarea
-                        id="inventoryDataCurl"
-                        placeholder="Enter curl command for fetching inventory data"
-                        value={scanFormData.inventoryDataCurl}
-                        onChange={(e) => handleScanFormChange('inventoryDataCurl', e.target.value)}
+                        id="scanTriggerCurl"
+                        placeholder="Enter curl command 2"
+                        value={scanFormData.scanTriggerCurl}
+                        onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientResultCurl">Curl Command 3 *</Label>
+                      <Textarea
+                        id="clientResultCurl"
+                        placeholder="Enter curl command 3"
+                        value={scanFormData.clientResultCurl}
+                        onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
@@ -433,7 +434,7 @@ const Dashboard = () => {
                     <Button
                       onClick={handleScanFormSubmit}
                       className="flex-1"
-                      disabled={!scanFormData.bearerToken.trim() || !scanFormData.scanDataCurl.trim() || !scanFormData.inventoryDataCurl.trim()}
+                      disabled={!scanFormData.bearerTokenCurl.trim() || !scanFormData.scanTriggerCurl.trim() || !scanFormData.clientResultCurl.trim()}
                     >
                       Run Scan
                     </Button>
