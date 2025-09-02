@@ -9,6 +9,8 @@ import json
 import subprocess
 from app.logging_config import get_logger
 import time
+import os
+import shutil
 
 # Get logger for this route
 logger = get_logger("data_scan")
@@ -22,6 +24,7 @@ class DataScanResponse(BaseModel):
     response_body: str
     execution_success: bool
     error: str = None
+    artifacts_created: bool = False
 
 class CurlExecutor:
     def __init__(self):
@@ -89,6 +92,7 @@ Response:
         )
 
         token = response.choices[0].message.content.strip().strip('"').strip()
+        
 
         if re.match(r"^[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.?[A-Za-z0-9\-_.+/=]*$", token):
             logger.info("🔐 Extracted token: Valid JWT format detected.")
@@ -118,6 +122,92 @@ Response:
         
         return curl_command
 
+def create_artifacts_folder():
+    """Create artifacts folder if it doesn't exist"""
+    artifacts_dir = "artifacts"
+    if not os.path.exists(artifacts_dir):
+        os.makedirs(artifacts_dir)
+        logger.info(f"📁 Created artifacts folder: {artifacts_dir}")
+    else:
+        logger.info(f"📁 Artifacts folder already exists: {artifacts_dir}")
+    return artifacts_dir
+
+def remove_artifacts_folder():
+    """Remove the artifacts folder if it exists"""
+    artifacts_dir = "artifacts"
+    try:
+        if os.path.exists(artifacts_dir):
+            shutil.rmtree(artifacts_dir)
+            logger.info(f"🧹 Removed artifacts folder: {artifacts_dir}")
+        else:
+            logger.info(f"ℹ️ Artifacts folder does not exist: {artifacts_dir}")
+    except Exception as e:
+        logger.error(f"❌ Failed to remove artifacts folder: {str(e)}")
+
+def _collect_scan_results_recursive(node) -> list:
+    """Recursively collect values for keys named 'scanResults' (case-insensitive)."""
+    results = []
+    try:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if isinstance(k, str) and k.lower() == "scanresults":
+                    if isinstance(v, list):
+                        results.extend(v)
+                # Recurse
+                results.extend(_collect_scan_results_recursive(v))
+        elif isinstance(node, list):
+            for item in node:
+                results.extend(_collect_scan_results_recursive(item))
+    except Exception as e:
+        logger.warning(f"⚠️ Error during recursive scanResults extraction: {e}")
+    return results
+
+def _best_effort_json_parse(text: str):
+    """Try to parse JSON; if it fails, attempt to extract JSON substring."""
+    try:
+        return json.loads(text)
+    except Exception:
+        # Try to find a plausible JSON substring
+        start_obj = text.find('{')
+        start_arr = text.find('[')
+        start = min([pos for pos in [start_obj, start_arr] if pos != -1], default=-1)
+        end_obj = text.rfind('}')
+        end_arr = text.rfind(']')
+        end = max(end_obj, end_arr)
+        if start != -1 and end != -1 and end > start:
+            snippet = text[start:end+1]
+            try:
+                return json.loads(snippet)
+            except Exception:
+                return None
+        return None
+
+def extract_and_store_scan_results(response_body: str) -> bool:
+    """Extract scanResults from response and store in artifacts folder."""
+    try:
+        logger.info(f"🧾 3rd response snippet (first 500 chars): {response_body[:500]}")
+        data = _best_effort_json_parse(response_body)
+        if data is None:
+            logger.error("❌ Failed to parse response as JSON (even after best-effort substring search)")
+            return False
+
+        logger.info("🔍 Searching for scanResults (case-insensitive) recursively...")
+        aggregated_scan_results = _collect_scan_results_recursive(data)
+        logger.info(f"📊 scanResults items found: {len(aggregated_scan_results)}")
+
+        # Always create artifacts and write (even if empty)
+        artifacts_dir = create_artifacts_folder()
+        client_result_file = os.path.join(artifacts_dir, "client_result.json")
+        with open(client_result_file, 'w', encoding='utf-8') as f:
+            json.dump(aggregated_scan_results, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"💾 Stored scanResults in: {client_result_file}")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Failed to extract and store scanResults: {str(e)}")
+        return False
+
 @router.post("/data-scan")
 async def data_scan(request: DataScanRequest):
     """
@@ -127,17 +217,21 @@ async def data_scan(request: DataScanRequest):
     if len(request.curl_commands) != 3:
         raise HTTPException(status_code=400, detail="Exactly 3 curl commands are required")
     
+    # Always start fresh: remove artifacts folder at the beginning
+    remove_artifacts_folder()
+    
     extracted_token = ""
     curl_executor = CurlExecutor()
+    artifacts_created = False
     
     # Execute 1st curl command to get token
     try:
         logger.info("🚀 Executing 1st curl command to generate token...")
         output = curl_executor.run_curl(request.curl_commands[0])
-        
+        logger.info(f"🔍 1st curl response: {output}")
         # Extract token using OpenAI
         extracted_token = await curl_executor.extract_token_from_gpt(output)
-        logger.info(f"✅ Token extracted successfully: {extracted_token[:20]}...")
+        logger.info(f"✅ Token extracted successfully: {extracted_token}...")
         
     except Exception as e:
         logger.error(f"❌ Failed to execute 1st curl or extract token: {str(e)}")
@@ -145,7 +239,7 @@ async def data_scan(request: DataScanRequest):
     
     # Execute 2nd curl command with token
     try:
-        logger.info("🚀 Executing 2nd curl command with authorization token...")
+        logger.info(f"🚀 Executing 2nd curl command with authorization token... {extracted_token}")
         curl_with_auth = curl_executor.add_authorization_header(request.curl_commands[1], extracted_token)
         curl_executor.run_curl(curl_with_auth)
         
@@ -155,7 +249,7 @@ async def data_scan(request: DataScanRequest):
     
     # Wait for 15 minutes before executing 3rd curl
     logger.info("⏰ Waiting 15 minutes before executing 3rd curl command...")
-    await asyncio.sleep(900)  # 15 minutes = 900 seconds
+    # await asyncio.sleep(900)  # 15 minutes = 900 seconds
     
     # Execute 3rd curl command with token
     try:
@@ -163,9 +257,14 @@ async def data_scan(request: DataScanRequest):
         curl_with_auth = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
         output = curl_executor.run_curl(curl_with_auth)
         
+        # Extract and store scanResults
+        logger.info("🔍 Processing 3rd curl response for scanResults...")
+        artifacts_created = extract_and_store_scan_results(output)
+        
         return DataScanResponse(
             response_body=output,
-            execution_success=True
+            execution_success=True,
+            artifacts_created=artifacts_created
         )
         
     except Exception as e:
@@ -173,6 +272,7 @@ async def data_scan(request: DataScanRequest):
         return DataScanResponse(
             response_body="",
             execution_success=False,
-            error=str(e)
+            error=str(e),
+            artifacts_created=False
         )
     
