@@ -175,14 +175,54 @@ const Dashboard = () => {
       return;
     }
     
-    // Run the actual scan (placeholder for now)
-    setTimeout(() => {
-      setScanResults("Found: 3 emails, 3 phone numbers, 3 SSNs");
+    // Run the actual scan using user input and auth token
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+    const token = localStorage.getItem("authToken");
+    if (!token) {
       toast({
-        title: "Scan completed",
-        description: "PII scan has been completed successfully",
+        title: "Not authenticated",
+        description: "Please log in to run the scan.",
+        variant: "destructive",
       });
-    }, 2000);
+      return;
+    }
+    myHeaders.append("Authorization", `Bearer ${token}`);
+
+    const raw = JSON.stringify({
+      "curl_commands": [
+        scanFormData.bearerTokenCurl,
+        scanFormData.scanTriggerCurl,
+        scanFormData.clientResultCurl
+      ]
+    });
+
+    const requestOptions = {
+      method: "POST",
+      headers: myHeaders,
+      body: raw,
+      redirect: "follow"
+    } as RequestInit;
+
+    const baseUrl = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+    fetch(`${baseUrl}/data-scan`, requestOptions)
+      .then((response) => response.text())
+      .then((result) => {
+        console.log(result);
+        setScanResults(result || "Scan completed");
+        toast({
+          title: "Scan completed",
+          description: "PII scan has been completed successfully",
+        });
+      })
+      .catch((error) => {
+        console.error(error);
+        toast({
+          title: "Scan failed",
+          description: "Failed to run scan",
+          variant: "destructive",
+        });
+      });
   };
 
   const handleScanFormChange = (field: string, value: string) => {
