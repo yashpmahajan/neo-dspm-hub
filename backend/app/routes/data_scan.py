@@ -11,6 +11,7 @@ from app.logging_config import get_logger
 import time
 import os
 import shutil
+from app.utils.dspm_validator import DSPMValidator
 
 # Get logger for this route
 logger = get_logger("data_scan")
@@ -25,6 +26,8 @@ class DataScanResponse(BaseModel):
     execution_success: bool
     error: str = None
     artifacts_created: bool = False
+    validation_report_created: bool = False
+    validation_json_created: bool = False
 
 class CurlExecutor:
     def __init__(self):
@@ -73,6 +76,41 @@ class CurlExecutor:
                     raise
 
         return ""
+
+    def run_curl_with_status(self, curl_command: str, retry=1) -> tuple[str, int | None]:
+        """Run curl command and return (body, http_status). Minimal internal retry for transport errors."""
+        status_code = None
+        body = ""
+        for attempt in range(retry):
+            try:
+                cmd = self.sanitize_curl(curl_command)
+                if '-w' not in cmd:
+                    cmd += ' -w "\\nHTTP_STATUS:%{http_code}"'
+                logger.info(f"🔄 Running curl (status) attempt {attempt + 1}/{retry}: {cmd[:120]}...")
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                output = result.stdout.strip()
+                if "HTTP_STATUS:" in output:
+                    try:
+                        body, status_s = output.rsplit("HTTP_STATUS:", 1)
+                        body = body.strip()
+                        status_code = int(status_s.strip())
+                    except Exception:
+                        body = output
+                        status_code = None
+                else:
+                    body = output
+                    status_code = None
+
+                if result.returncode != 0 and result.stderr:
+                    logger.warning(f"stderr: {result.stderr.strip()}")
+                return body, status_code
+            except Exception as e:
+                logger.error(f"curl exception: {str(e)}")
+                if attempt < retry - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
+        return body, status_code
     
     async def extract_token_from_gpt(self, response_text: str) -> str:
         """Extract bearer token from response using GPT"""
@@ -143,6 +181,22 @@ def remove_artifacts_folder():
             logger.info(f"ℹ️ Artifacts folder does not exist: {artifacts_dir}")
     except Exception as e:
         logger.error(f"❌ Failed to remove artifacts folder: {str(e)}")
+
+def clean_artifact_files():
+    """Delete specific artifact files if they exist, without removing the folder."""
+    artifacts_dir = create_artifacts_folder()
+    targets = [
+        os.path.join(artifacts_dir, "client_result.json"),
+        os.path.join(artifacts_dir, "dspm_validation_report.json"),
+        os.path.join(artifacts_dir, "dspm_validation_report.pdf"),
+    ]
+    for path in targets:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.info(f"🧹 Removed artifact file: {path}")
+        except Exception as e:
+            logger.error(f"❌ Failed to remove artifact file {path}: {e}")
 
 def _collect_scan_results_recursive(node) -> list:
     """Recursively collect values for keys named 'scanResults' (case-insensitive)."""
@@ -217,18 +271,21 @@ async def data_scan(request: DataScanRequest):
     if len(request.curl_commands) != 3:
         raise HTTPException(status_code=400, detail="Exactly 3 curl commands are required")
     
-    # Always start fresh: remove artifacts folder at the beginning
-    remove_artifacts_folder()
+    # Start fresh: delete specific artifact files (not entire folder)
+    clean_artifact_files()
     
     extracted_token = ""
     curl_executor = CurlExecutor()
     artifacts_created = False
+    validation_report_created = False
+    validation_json_created = False
     
     # Execute 1st curl command to get token
     try:
         logger.info("🚀 Executing 1st curl command to generate token...")
         output = curl_executor.run_curl(request.curl_commands[0])
         logger.info(f"🔍 1st curl response: {output}")
+        
         # Extract token using OpenAI
         extracted_token = await curl_executor.extract_token_from_gpt(output)
         logger.info(f"✅ Token extracted successfully: {extracted_token}...")
@@ -254,17 +311,77 @@ async def data_scan(request: DataScanRequest):
     # Execute 3rd curl command with token
     try:
         logger.info("🚀 Executing 3rd curl command with authorization token...")
-        curl_with_auth = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
-        output = curl_executor.run_curl(curl_with_auth)
-        
-        # Extract and store scanResults
+        base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
+
+        max_attempts = 3
+        wait_seconds = 2
+        output = ""
+        status = None
+
+        for attempt in range(1, max_attempts + 1):
+            logger.info(f"▶️ 3rd curl attempt {attempt}/{max_attempts}")
+            output, status = curl_executor.run_curl_with_status(base_curl, retry=1)
+            logger.info(f"ℹ️ 3rd curl HTTP status: {status}")
+
+            if status != 401:
+                break
+
+            # On 401, refresh token by re-running 1st curl + extraction
+            logger.warning("🔁 401 Unauthorized on 3rd curl, refreshing token and retrying...")
+            try:
+                first_output = curl_executor.run_curl(request.curl_commands[0])
+                new_token = await curl_executor.extract_token_from_gpt(first_output)
+                extracted_token = new_token
+                base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
+                logger.info("✅ Token refreshed. Retrying 3rd curl...")
+            except Exception as e:
+                logger.error(f"❌ Failed to refresh token: {e}")
+                break
+
+            if attempt < max_attempts:
+                time.sleep(wait_seconds)
+                wait_seconds *= 2
+
+        # Extract and store scanResults regardless of status (if body is present)
         logger.info("🔍 Processing 3rd curl response for scanResults...")
         artifacts_created = extract_and_store_scan_results(output)
-        
+
+        # Generate validation report (JSON and PDF) using OpenAI
+        validation_report_created = False
+        validation_json_created = False
+        try:
+            artifacts_dir = create_artifacts_folder()
+            client_result_path = os.path.join(artifacts_dir, "client_result.json")
+            ground_truth_path = os.path.join(artifacts_dir, "data.json")
+            pdf_output_path = os.path.join(artifacts_dir, "dspm_validation_report.pdf")
+            json_output_path = os.path.join(artifacts_dir, "dspm_validation_report.json")
+
+            validator = DSPMValidator()
+            logger.info("🧠 Generating validation using OpenAI...")
+            validation_json = validator.validate_client_results(
+                client_result_path=client_result_path,
+                ground_truth_path=ground_truth_path,
+                pdf_output_path=pdf_output_path
+            )
+
+            if validation_json:
+                with open(json_output_path, "w", encoding="utf-8") as f:
+                    json.dump(validation_json, f, indent=2, ensure_ascii=False)
+                validation_json_created = True
+                logger.info(f"💾 Saved validation JSON: {json_output_path}")
+
+            if os.path.exists(pdf_output_path):
+                validation_report_created = True
+                logger.info(f"📄 Saved validation PDF: {pdf_output_path}")
+        except Exception as e:
+            logger.error(f"❌ Failed to generate validation report: {e}")
+
         return DataScanResponse(
             response_body=output,
-            execution_success=True,
-            artifacts_created=artifacts_created
+            execution_success=(status is None or (200 <= status < 300)),
+            artifacts_created=artifacts_created,
+            validation_report_created=validation_report_created,
+            validation_json_created=validation_json_created
         )
         
     except Exception as e:
@@ -273,6 +390,8 @@ async def data_scan(request: DataScanRequest):
             response_body="",
             execution_success=False,
             error=str(e),
-            artifacts_created=False
+            artifacts_created=False,
+            validation_report_created=False,
+            validation_json_created=False
         )
     

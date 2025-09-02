@@ -18,6 +18,10 @@ DATA = [
 SAVE_DIR = "app/generated_files"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# Also persist the raw data as JSON in the artifacts directory with cleanup
+ARTIFACTS_DIR = "artifacts"
+os.makedirs(ARTIFACTS_DIR, exist_ok=True)
+
 @router.get("/generatedata")
 def generate_data(
     filetype: str = Query(..., enum=["json", "pdf", "csv"]),
@@ -28,6 +32,11 @@ def generate_data(
         file_path = os.path.join(SAVE_DIR, f)
         if os.path.isfile(file_path):
             os.remove(file_path)
+
+    # Cleanup previous artifacts/data.json if present
+    artifact_json_path = os.path.join(ARTIFACTS_DIR, "data.json")
+    if os.path.exists(artifact_json_path) and os.path.isfile(artifact_json_path):
+        os.remove(artifact_json_path)
 
     filename = os.path.join(SAVE_DIR, f"data.{filetype}")
     # Create file
@@ -52,6 +61,10 @@ def generate_data(
         pdf.output(filename)
     else:
         raise HTTPException(status_code=400, detail="Invalid file type")
+
+    # Always store a JSON copy of DATA into artifacts/data.json
+    with open(artifact_json_path, "w") as af:
+        json.dump(DATA, af, indent=2)
     # Return file
     return FileResponse(filename, media_type="application/octet-stream", filename=os.path.basename(filename))
 # Upload generated file to a new AWS S3 bucket with timestamp in name, then upload file in userID folder
