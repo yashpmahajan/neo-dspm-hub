@@ -32,14 +32,31 @@ const Settings = () => {
   });
   const { toast } = useToast();
 
-  const handleAwsSubmit = (e: React.FormEvent) => {
+  const handleAwsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Handle AWS credentials save
+      // Persist locally for UX
       localStorage.setItem("aws_credentials", JSON.stringify(awsCredentials));
+
+      // Persist to backend (.env)
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_API}/store-aws-creds`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_key_id: awsCredentials.accessKey,
+          secret_access_key: awsCredentials.secretKey,
+          region: awsCredentials.region,
+          bucket_name: awsCredentials.bucketName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(errorText || "Failed to store AWS credentials on server");
+      }
+
       toast({
         title: "AWS Configuration saved",
-        description: "Your AWS credentials have been saved successfully.",
         duration: 3000,
       });
     } catch (error) {

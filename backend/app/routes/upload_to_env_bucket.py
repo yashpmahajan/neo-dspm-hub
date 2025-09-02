@@ -24,8 +24,8 @@ def upload_env_bucket():
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
     AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
-    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME]):
-        raise HTTPException(status_code=500, detail="AWS credentials or bucket name not set in ENV.")
+    # if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME]):
+    #     raise HTTPException(status_code=500, detail="AWS credentials or bucket name not set in ENV.")
 
     # Find the first generated file
     filetype = None

@@ -418,7 +418,7 @@ async def data_scan(request: DataScanRequest, current_user: dict = Depends(get_c
     
     # Wait for 15 minutes before executing 3rd curl
     logger.info("⏰ Waiting 15 minutes before executing 3rd curl command...")
-    # await asyncio.sleep(900)  # 15 minutes = 900 seconds
+    await asyncio.sleep(900)  # 15 minutes = 900 seconds
     
     # Execute 3rd curl command with token
     try:
