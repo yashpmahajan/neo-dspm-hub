@@ -40,6 +40,8 @@ const Dashboard = () => {
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [showScanForm, setShowScanForm] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStep, setScanStep] = useState(1);
   const [scanFormData, setScanFormData] = useState({
     bearerTokenCurl: '',
     scanTriggerCurl: '',
@@ -175,6 +177,14 @@ const Dashboard = () => {
       return;
     }
     
+    // Start the scan process with progress
+    setIsScanning(true);
+    setScanStep(1);
+    
+    // Simulate step progression
+    setTimeout(() => setScanStep(2), 2000);
+    setTimeout(() => setScanStep(3), 300000); // 5 minutes for step 3
+    
     // Run the actual scan using user input and auth token
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
@@ -185,6 +195,8 @@ const Dashboard = () => {
         description: "Please log in to run the scan.",
         variant: "destructive",
       });
+      setIsScanning(false);
+      setScanStep(1);
       return;
     }
     myHeaders.append("Authorization", `Bearer ${token}`);
@@ -210,6 +222,8 @@ const Dashboard = () => {
       .then((result) => {
         console.log(result);
         setScanResults(result || "Scan completed");
+        setIsScanning(false);
+        setScanStep(1);
         toast({
           title: "Scan completed",
           description: "PII scan has been completed successfully",
@@ -217,6 +231,8 @@ const Dashboard = () => {
       })
       .catch((error) => {
         console.error(error);
+        setIsScanning(false);
+        setScanStep(1);
         toast({
           title: "Scan failed",
           description: "Failed to run scan",
@@ -259,6 +275,43 @@ const Dashboard = () => {
     }
   };
 
+  const downloadArtifacts = async () => {
+    try {
+      const baseUrl = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+      const res = await fetch(`${baseUrl}/download/artifacts`, { method: 'GET' })
+      if (!res.ok) {
+        throw new Error(`Failed to download artifacts: ${res.status}`)
+      }
+      const blob = await res.blob()
+      let filename = 'scan_artifacts.zip'
+      const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition')
+      if (cd) {
+        const m = cd.match(/filename="?([^";]+)"?/i)
+        if (m && m[1]) filename = m[1]
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      
+      toast({
+        title: "Artifacts downloaded",
+        description: "Scan artifacts have been downloaded successfully",
+      });
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: "Download failed",
+        description: "Failed to download artifacts",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetConfiguration = () => {
     // Clear all UI state
     setSyntheticData([]);
@@ -269,6 +322,8 @@ const Dashboard = () => {
     setIsUploading(false);
     setUploadedFileUrl('');
     setShowScanForm(false);
+    setIsScanning(false);
+    setScanStep(1);
     setScanFormData({
       bearerTokenCurl: '',
       scanTriggerCurl: '',
@@ -446,57 +501,97 @@ const Dashboard = () => {
               </Button>
             ) : (
               <>
-                {/* Scan Configuration Form */}
-                <div className="space-y-4 pt-2 border-t">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="bearerTokenCurl">Bearer Token Curl *</Label>
-                      <Textarea
-                        id="bearerTokenCurl"
-                        placeholder="Enter bearer token curl command"
-                        value={scanFormData.bearerTokenCurl}
-                        onChange={(e) => handleScanFormChange('bearerTokenCurl', e.target.value)}
-                        className="min-h-[100px]"
-                      />
+                {!isScanning ? (
+                  <>
+                    {/* Scan Configuration Form */}
+                    <div className="space-y-4 pt-2 border-t">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="bearerTokenCurl">Bearer Token Curl *</Label>
+                          <Textarea
+                            id="bearerTokenCurl"
+                            placeholder="Enter bearer token curl command"
+                            value={scanFormData.bearerTokenCurl}
+                            onChange={(e) => handleScanFormChange('bearerTokenCurl', e.target.value)}
+                            className="min-h-[100px]"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="scanTriggerCurl">Scan Trigger Curl *</Label>
+                          <Textarea
+                            id="scanTriggerCurl"
+                            placeholder="Enter scan trigger curl command"
+                            value={scanFormData.scanTriggerCurl}
+                            onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
+                            className="min-h-[100px]"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="clientResultCurl">Client Result Curl *</Label>
+                          <Textarea
+                            id="clientResultCurl"
+                            placeholder="Enter client result curl command"
+                            value={scanFormData.clientResultCurl}
+                            onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
+                            className="min-h-[100px]"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setShowScanForm(false)}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleScanFormSubmit}
+                          className="flex-1"
+                          disabled={!scanFormData.bearerTokenCurl.trim() || !scanFormData.scanTriggerCurl.trim() || !scanFormData.clientResultCurl.trim()}
+                        >
+                          Run Scan
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="scanTriggerCurl">Scan Trigger Curl *</Label>
-                      <Textarea
-                        id="scanTriggerCurl"
-                        placeholder="Enter scan trigger curl command"
-                        value={scanFormData.scanTriggerCurl}
-                        onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
-                        className="min-h-[100px]"
-                      />
+                  </>
+                ) : (
+                  <>
+                    {/* Scan Progress */}
+                    <div className="space-y-4 pt-2 border-t">
+                      <div className="flex items-center justify-center p-6">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                      
+                      {/* Step Indicators */}
+                      <div className="space-y-3">
+                        <div className={`flex items-center gap-2 ${scanStep >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${scanStep >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            {scanStep > 1 ? <CheckCircle className="h-3 w-3" /> : '1'}
+                          </div>
+                          <span className="text-sm font-medium">Step 1: Preparing</span>
+                        </div>
+                        <div className={`flex items-center gap-2 ${scanStep >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${scanStep >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            {scanStep > 2 ? <CheckCircle className="h-3 w-3" /> : scanStep === 2 ? <Loader2 className="h-3 w-3 animate-spin" /> : '2'}
+                          </div>
+                          <span className="text-sm font-medium">Step 2: Running Scan</span>
+                        </div>
+                        <div className={`flex items-center gap-2 ${scanStep >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${scanStep >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            {scanStep === 3 ? <Loader2 className="h-3 w-3 animate-spin" /> : '3'}
+                          </div>
+                          <span className="text-sm font-medium">Step 3: Fetching Results</span>
+                        </div>
+                      </div>
+                      
+                      <div className="text-center space-y-2">
+                        <p className="text-sm font-medium">Scan in progress...</p>
+                        <p className="text-xs text-muted-foreground">This may take up to 15 minutes. Please keep this tab open.</p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="clientResultCurl">Client Result Curl *</Label>
-                      <Textarea
-                        id="clientResultCurl"
-                        placeholder="Enter client result curl command"
-                        value={scanFormData.clientResultCurl}
-                        onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
-                        className="min-h-[100px]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setShowScanForm(false)}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleScanFormSubmit}
-                      className="flex-1"
-                      disabled={!scanFormData.bearerTokenCurl.trim() || !scanFormData.scanTriggerCurl.trim() || !scanFormData.clientResultCurl.trim()}
-                    >
-                      Run Scan
-                    </Button>
-                  </div>
-                </div>
+                  </>
+                )}
               </>
             )}
 
@@ -520,12 +615,23 @@ const Dashboard = () => {
               Download a full PDF report of scan results.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <Button
               onClick={downloadReport}
               className="w-full"
+              disabled={!scanResults}
             >
+              <Download className="h-4 w-4 mr-2" />
               Download Report
+            </Button>
+            <Button
+              onClick={downloadArtifacts}
+              variant="outline"
+              className="w-full"
+              disabled={!scanResults}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Artifacts
             </Button>
           </CardContent>
         </Card>
