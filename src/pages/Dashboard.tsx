@@ -393,30 +393,30 @@ const Dashboard = () => {
                 <div className="space-y-4 pt-2 border-t">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="bearerTokenCurl">Curl Command 1 *</Label>
+                      <Label htmlFor="bearerTokenCurl">Bearer Token Curl *</Label>
                       <Textarea
                         id="bearerTokenCurl"
-                        placeholder="Enter curl command 1"
+                        placeholder="Enter bearer token curl command"
                         value={scanFormData.bearerTokenCurl}
                         onChange={(e) => handleScanFormChange('bearerTokenCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="scanTriggerCurl">Curl Command 2 *</Label>
+                      <Label htmlFor="scanTriggerCurl">Scan Trigger Curl *</Label>
                       <Textarea
                         id="scanTriggerCurl"
-                        placeholder="Enter curl command 2"
+                        placeholder="Enter scan trigger curl command"
                         value={scanFormData.scanTriggerCurl}
                         onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="clientResultCurl">Curl Command 3 *</Label>
+                      <Label htmlFor="clientResultCurl">Client Result Curl *</Label>
                       <Textarea
                         id="clientResultCurl"
-                        placeholder="Enter curl command 3"
+                        placeholder="Enter client result curl command"
                         value={scanFormData.clientResultCurl}
                         onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
                         className="min-h-[100px]"
