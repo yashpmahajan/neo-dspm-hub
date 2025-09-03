@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,52 @@ const Dashboard = () => {
     clientResultCurl: ''
   });
   const { toast } = useToast();
+
+  // LocalStorage keys for persistence
+  const SCAN_STATE_KEY = 'dashboardScanState';
+
+  // Save scan state to localStorage
+  const saveScanState = (state: {
+    isScanning: boolean;
+    scanCompleted: boolean;
+    isScanExpanded: boolean;
+    scanFormData: typeof scanFormData;
+  }) => {
+    localStorage.setItem(SCAN_STATE_KEY, JSON.stringify(state));
+  };
+
+  // Load scan state from localStorage
+  const loadScanState = () => {
+    try {
+      const saved = localStorage.getItem(SCAN_STATE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Failed to load scan state:', error);
+    }
+    return null;
+  };
+
+  // Clear scan state from localStorage
+  const clearScanState = () => {
+    localStorage.removeItem(SCAN_STATE_KEY);
+  };
+
+  // Restore state from localStorage on component mount
+  useEffect(() => {
+    const savedState = loadScanState();
+    if (savedState) {
+      setIsScanning(savedState.isScanning || false);
+      setScanCompleted(savedState.scanCompleted || false);
+      setIsScanExpanded(savedState.isScanExpanded || false);
+      setScanFormData(savedState.scanFormData || {
+        bearerTokenCurl: '',
+        scanTriggerCurl: '',
+        clientResultCurl: ''
+      });
+    }
+  }, []);
 
   // Get auth token from localStorage
   const getAuthHeaders = () => {
@@ -178,6 +224,14 @@ const Dashboard = () => {
     setIsScanning(true);
     setScanStep(1);
     
+    // Save scan state to localStorage
+    saveScanState({
+      isScanning: true,
+      scanCompleted: false,
+      isScanExpanded: true,
+      scanFormData
+    });
+    
     // Simulate step progression
     setTimeout(() => setScanStep(2), 2000);
     setTimeout(() => setScanStep(3), 300000); // 5 minutes for step 3
@@ -194,6 +248,12 @@ const Dashboard = () => {
       });
       setIsScanning(false);
       setScanStep(1);
+      saveScanState({
+        isScanning: false,
+        scanCompleted: false,
+        isScanExpanded: true,
+        scanFormData
+      });
       return;
     }
     myHeaders.append("Authorization", `Bearer ${token}`);
@@ -222,6 +282,15 @@ const Dashboard = () => {
         setIsScanning(false);
         setScanCompleted(true);
         setScanStep(1);
+        
+        // Save completed state to localStorage
+        saveScanState({
+          isScanning: false,
+          scanCompleted: true,
+          isScanExpanded: true,
+          scanFormData
+        });
+        
         toast({
           title: "Scan completed",
           description: "PII scan has been completed successfully",
@@ -231,6 +300,15 @@ const Dashboard = () => {
         console.error(error);
         setIsScanning(false);
         setScanStep(1);
+        
+        // Save error state to localStorage
+        saveScanState({
+          isScanning: false,
+          scanCompleted: false,
+          isScanExpanded: true,
+          scanFormData
+        });
+        
         toast({
           title: "Scan failed",
           description: "Failed to run scan",
@@ -240,10 +318,19 @@ const Dashboard = () => {
   };
 
   const handleScanFormChange = (field: string, value: string) => {
-    setScanFormData(prev => ({
-      ...prev,
+    const newFormData = {
+      ...scanFormData,
       [field]: value
-    }));
+    };
+    setScanFormData(newFormData);
+    
+    // Save updated form data to localStorage
+    saveScanState({
+      isScanning,
+      scanCompleted,
+      isScanExpanded,
+      scanFormData: newFormData
+    });
   };
 
   const downloadReport = async () => {
@@ -329,6 +416,9 @@ const Dashboard = () => {
       clientResultCurl: ''
     });
     setIsResetDialogOpen(false);
+    
+    // Clear localStorage
+    clearScanState();
     
     toast({
       title: "Configuration reset",
