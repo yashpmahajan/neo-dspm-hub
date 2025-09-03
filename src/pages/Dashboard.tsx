@@ -42,6 +42,7 @@ const Dashboard = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
   const [scanStep, setScanStep] = useState(1);
+  const [isScanExpanded, setIsScanExpanded] = useState(false);
   const [scanFormData, setScanFormData] = useState({
     bearerTokenCurl: '',
     scanTriggerCurl: '',
@@ -321,6 +322,7 @@ const Dashboard = () => {
     setIsScanning(false);
     setScanCompleted(false);
     setScanStep(1);
+    setIsScanExpanded(false);
     setScanFormData({
       bearerTokenCurl: '',
       scanTriggerCurl: '',
@@ -485,13 +487,27 @@ const Dashboard = () => {
               Run Scan
             </CardTitle>
             <CardDescription>
-              Configure and run scan for sensitive data patterns.
+              {!isScanExpanded && !isScanning && !scanCompleted 
+                ? "Click to configure and start a new scan"
+                : "Configure and run scan for sensitive data patterns."
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!isScanning && !scanCompleted ? (
+            {!isScanExpanded && !isScanning && !scanCompleted ? (
               <>
-                {/* Scan Configuration Form - Initial State */}
+                {/* Collapsed State - Default View */}
+                <Button
+                  onClick={() => setIsScanExpanded(true)}
+                  className="w-full"
+                >
+                  <Scan className="h-4 w-4 mr-2" />
+                  Start Scan
+                </Button>
+              </>
+            ) : isScanExpanded && !isScanning && !scanCompleted ? (
+              <>
+                {/* Expanded State - Form View */}
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
@@ -505,20 +521,20 @@ const Dashboard = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="scanTriggerCurl">Scan Trigger Curl *</Label>
+                      <Label htmlFor="scanTriggerCurl">Scan Data Curl *</Label>
                       <Textarea
                         id="scanTriggerCurl"
-                        placeholder="Enter scan trigger curl command"
+                        placeholder="Enter scan data curl command"
                         value={scanFormData.scanTriggerCurl}
                         onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="clientResultCurl">Client Result Curl *</Label>
+                      <Label htmlFor="clientResultCurl">Fetch Inventory Curl *</Label>
                       <Textarea
                         id="clientResultCurl"
-                        placeholder="Enter client result curl command"
+                        placeholder="Enter fetch inventory curl command"
                         value={scanFormData.clientResultCurl}
                         onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
                         className="min-h-[100px]"
@@ -557,8 +573,8 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="text-center space-y-2">
-                    <p className="text-sm font-medium text-green-600">Scan completed successfully!</p>
-                    <p className="text-xs text-muted-foreground">Please download the report or artifacts to view results.</p>
+                    <p className="text-sm font-medium text-green-600">✅ Run Scan completed.</p>
+                    <p className="text-xs text-muted-foreground">Please download the report or artifacts.</p>
                   </div>
                 </div>
               </>
