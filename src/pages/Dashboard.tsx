@@ -275,13 +275,19 @@ const Dashboard = () => {
 
   const downloadArtifacts = async () => {
     try {
-      const baseUrl = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
-      const res = await fetch(`${baseUrl}/download/artifacts`, { method: 'GET' })
+      const token = localStorage.getItem("authToken");
+      const backendApi = import.meta.env.VITE_BACKEND_API;
+      const res = await fetch(`${backendApi}/download/artifacts-zip`, { 
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!res.ok) {
         throw new Error(`Failed to download artifacts: ${res.status}`)
       }
       const blob = await res.blob()
-      let filename = 'scan_artifacts.zip'
+      let filename = 'artifacts.zip'
       const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition')
       if (cd) {
         const m = cd.match(/filename="?([^";]+)"?/i)
@@ -597,7 +603,6 @@ const Dashboard = () => {
             <Button
               onClick={downloadReport}
               className="w-full"
-              disabled={!scanCompleted}
             >
               <Download className="h-4 w-4 mr-2" />
               Download Report
@@ -606,7 +611,6 @@ const Dashboard = () => {
               onClick={downloadArtifacts}
               variant="outline"
               className="w-full"
-              disabled={!scanCompleted}
             >
               <Download className="h-4 w-4 mr-2" />
               Download Artifacts
