@@ -320,7 +320,7 @@ def _find_token_in_json(node):
     return None
 
 def extract_and_store_scan_results(response_body: str) -> bool:
-    """Extract scanResults from response and store in artifacts folder."""
+    """Extract entitySnippet data from response and store in artifacts folder."""
     try:
         logger.info(f"🧾 3rd response snippet (first 500 chars): {response_body[:500]}")
         data = _best_effort_json_parse(response_body)
@@ -328,21 +328,42 @@ def extract_and_store_scan_results(response_body: str) -> bool:
             logger.error("❌ Failed to parse response as JSON (even after best-effort substring search)")
             return False
 
-        logger.info("🔍 Searching for scanResults (case-insensitive) recursively...")
-        aggregated_scan_results = _collect_scan_results_recursive(data)
-        logger.info(f"📊 scanResults items found: {len(aggregated_scan_results)}")
+        logger.info("🔍 Searching for entitySnippet data...")
+        
+        # Extract entitySnippet data - check for nested structure first
+        entity_snippet_data = []
+        
+        # First check if response has statusCode and data structure
+        if isinstance(data, dict) and "data" in data and isinstance(data["data"], dict):
+            nested_data = data["data"]
+            if "entitySnippet" in nested_data:
+                entity_snippet_data = nested_data["entitySnippet"]
+                logger.info(f"📊 entitySnippet items found in nested data: {len(entity_snippet_data)}")
+        # Then check direct structure
+        elif isinstance(data, dict) and "entitySnippet" in data:
+            entity_snippet_data = data["entitySnippet"]
+            logger.info(f"📊 entitySnippet items found: {len(entity_snippet_data)}")
+        elif isinstance(data, list):
+            # If response is directly a list, use it
+            entity_snippet_data = data
+            logger.info(f"📊 Direct list items found: {len(entity_snippet_data)}")
+        else:
+            # Fallback: look for scanResults in case old format is still returned
+            entity_snippet_data = _collect_scan_results_recursive(data)
+            logger.info(f"📊 scanResults items found (fallback): {len(entity_snippet_data)}")
 
         # Always create artifacts and write (even if empty)
         artifacts_dir = create_artifacts_folder()
         client_result_file = os.path.join(artifacts_dir, "client_result.json")
         with open(client_result_file, 'w', encoding='utf-8') as f:
-            json.dump(aggregated_scan_results, f, indent=2, ensure_ascii=False)
+            json.dump(entity_snippet_data, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"💾 Stored scanResults in: {client_result_file}")
+        logger.info(f"💾 Stored entity snippet data in: {client_result_file}")
+        logger.info(f"📊 Final data stored has {len(entity_snippet_data)} items")
         return True
 
     except Exception as e:
-        logger.error(f"❌ Failed to extract and store scanResults: {str(e)}")
+        logger.error(f"❌ Failed to extract and store entity snippet data: {str(e)}")
         return False
 
 @router.post("/data-scan")
