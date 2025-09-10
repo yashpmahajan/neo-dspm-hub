@@ -363,7 +363,7 @@ const Dashboard = () => {
   const downloadArtifacts = async () => {
     try {
       const baseUrl = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
-      const res = await fetch(`${baseUrl}/download/artifacts`, { method: 'GET' })
+      const res = await fetch(`${baseUrl}/download/artifacts-zip`, { method: 'GET' })
       if (!res.ok) {
         throw new Error(`Failed to download artifacts: ${res.status}`)
       }
@@ -570,7 +570,8 @@ const Dashboard = () => {
         </Card>
 
         {/* Run Scan */}
-        <Card className="h-fit">
+        <div className="lg:col-span-2 flex justify-center">
+        <Card className="h-fit w-full max-w-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Scan className="h-6 w-6 text-primary" />
@@ -666,43 +667,25 @@ const Dashboard = () => {
                     <p className="text-sm font-medium text-green-600">✅ Run Scan completed.</p>
                     <p className="text-xs text-muted-foreground">Please download the report or artifacts.</p>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Button onClick={downloadReport} className="w-full">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Report
+                    </Button>
+                    <Button onClick={downloadArtifacts} variant="outline" className="w-full">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Artifacts
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : null}
           </CardContent>
         </Card>
+        </div>
 
-        {/* Download Report */}
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="h-6 w-6 text-primary" />
-              Download Report
-            </CardTitle>
-            <CardDescription>
-              Download a full PDF report of scan results.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              onClick={downloadReport}
-              className="w-full"
-              disabled={!scanCompleted}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Report
-            </Button>
-            <Button
-              onClick={downloadArtifacts}
-              variant="outline"
-              className="w-full"
-              disabled={!scanCompleted}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Artifacts
-            </Button>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {/* Reset Configuration Button */}

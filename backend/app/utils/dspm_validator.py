@@ -83,6 +83,8 @@ class DSPMValidator:
  # Try this simplified version first to test if JSON parsing works:
 
         prompt = (
+            "Input Test Data (Ground Truth):\n" + ground_truth_content + "\n\n"
+            "API Scan Data (Client Results):\n" + client_result_content + "\n"  
             "You are an expert in report generation for Data Security Posture Management (DSPM) solutions.\n"
             "You will receive two sets of structured input:\n"
             "1. Input Test Data file (ground truth) containing sensitive entities.\n"
@@ -192,8 +194,6 @@ class DSPMValidator:
             "  }\n"
             "}\n"
             "---\n"
-            "Input Test Data (Ground Truth):\n" + ground_truth_content + "\n\n"
-            "API Scan Data (Client Results):\n" + client_result_content + "\n"  
         )
         try:
             # Prefer JSON-mode if supported; fallback otherwise

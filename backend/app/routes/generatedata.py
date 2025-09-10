@@ -16,15 +16,22 @@ os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
 # Strict financial test card generation prompt
 CARD_PROMPT = (
-    "You are an expert in generating realistic financial information for testing purposes. "
-    "Generate 3 realistic credit card entries in JSON format with the following fields: cardHolderName, cardNumber, expirationDate, cvv, cardType, and billingAddress. "
-    "Guidelines: The cardHolderName should be a realistic full name. The cardNumber should conform to valid patterns: Visa: starts with 4 and is 16 digits long. MasterCard: starts with 51–55 or 2221–2720 and is 16 digits long. American Express (Amex): starts with 34 or 37 and is 15 digits long. "
-    "The expirationDate should be a future date in \"MM/YY\" format, within the next 5 years from current date. "
-    "The cvv should: Be 3 digits for Visa and MasterCard. Be 4 digits for Amex. "
-    "The billingAddress should be a realistic U.S. address (with street, city, state abbreviation, and ZIP code), and should not contain placeholder or dummy combinations like 1234 or ABCD. "
-    "Avoid using dummy values like \"4111 1111 1111 1111\" or \"1234567890123456\". "
-    "Everything should appear legitimate and production-like, but not real or tied to real individuals or active financial accounts. "
-    "Do not generate any comments."
+    "You are a data generation expert. Generate exactly 3 highly realistic, unique, and plausible personal information records in strict JSON array format. "
+    "Each record must include the following fields: firstName, lastName, email, ssnNumber, drivingLicenseNumber, passportNumber, dateOfBirth, and address. "
+    "Requirements for each field:\n"
+    "- firstName, lastName: Use common, natural names (avoid placeholders or obviously fake names).\n"
+    "- email: Use realistic formats and common domains (e.g., gmail.com, yahoo.com, outlook.com, live.com), but do not use real or existing addresses. Do not use 'test', 'example', or similar dummy values.\n"
+    "- ssnNumber: Use the format NNN-NN-NNNN, but do NOT use obvious dummy values (e.g., 123-45-6789, 987-65-4321, or any sequential/repetitive numbers). Use plausible, random numbers that look authentic.\n"
+    "- drivingLicenseNumber: Format as two uppercase state initials followed by 6 digits (e.g., 'CA548745'). Use valid US state abbreviations. Do not use obvious patterns or dummy numbers.\n"
+    "- passportNumber: Format as one uppercase letter followed by 8 digits (e.g., 'Y32567891'). Do not use 'A12345678' or similar dummy values.\n"
+    "- dateOfBirth: Use realistic dates in the format YYYY-MM-DD. Ensure ages are plausible for adults (e.g., 21-65 years old).\n"
+    "- address: Use realistic US addresses, including street, city, state abbreviation, and zip code. Do not use obviously fake or placeholder addresses, and avoid using letter combinations like 'BDGFHJKLMNOPQRSTUVWXY' in addresses.\n"
+    "\n"
+    "Strict rules:\n"
+    "- All data must look authentic and indistinguishable from real data, but must not correspond to any real individuals.\n"
+    "- Do NOT use any dummy, sequential, or repetitive values (e.g., 123456, 1234, 12345678, 987654321, etc.).\n"
+    "- Do NOT use any example, test, or placeholder values.\n"
+    "- Do NOT include any comments, explanations, or extra information—output ONLY the JSON array.\n"
 )
 
 def clean_ollama_output(text: str) -> str:
@@ -147,4 +154,97 @@ def generate_data(
         json.dump(processed_data, af, indent=2, ensure_ascii=False)
 
     return FileResponse(filename, media_type=media_type, filename=os.path.basename(filename))
- 
+
+
+@router.post("/uploadtobucket")
+def upload_to_bucket(
+    current_user: dict = Depends(get_current_user)
+):
+    # Auto-detect filetype from available files
+    filetype = None
+    filename = None
+    for ext in ["json", "pdf", "csv"]:
+        test_path = os.path.join(SAVE_DIR, f"data.{ext}")
+        if os.path.exists(test_path):
+            filetype = ext
+            filename = test_path
+            break
+    if not filetype or not filename:
+        raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
+
+    # Get user id from DB
+    user = users_collection.find_one({"username": current_user["username"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in DB.")
+    user_id = str(user["_id"])
+
+    # AWS credentials from ENV
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+        raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
+
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_REGION
+    )
+
+    # Create bucket name with timestamp
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    bucket_name = f"neo-bucket-{timestamp}"
+
+    # Create bucket
+    try:
+        if AWS_REGION == "us-east-1":
+            s3.create_bucket(Bucket=bucket_name)
+        else:
+            s3.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": AWS_REGION}
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create bucket: {e}")
+
+    # S3 key: userID/data.filetype
+    s3_key = f"{user_id}/data.{filetype}"
+
+    try:
+        s3.upload_file(filename, bucket_name, s3_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload to S3: {e}")
+
+    file_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+    return {"msg": "File uploaded successfully", "bucket_name": bucket_name, "file_url": file_url}
+
+# Delete an AWS S3 bucket by name
+@router.delete("/deletebucket")
+def delete_bucket(bucket_name: str = Query(...), current_user: dict = Depends(get_current_user)):
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+        raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
+
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_REGION
+    )
+
+    # First, delete all objects in the bucket
+    try:
+        # List objects in the bucket
+        objects = s3.list_objects_v2(Bucket=bucket_name)
+        if 'Contents' in objects:
+            for obj in objects['Contents']:
+                s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+        # Delete the bucket
+        s3.delete_bucket(Bucket=bucket_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete bucket: {e}")
+
+    return {"msg": f"Bucket '{bucket_name}' deleted successfully."}
