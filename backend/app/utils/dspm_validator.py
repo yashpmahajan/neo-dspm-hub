@@ -80,44 +80,121 @@ class DSPMValidator:
         with open(ground_truth_path, "r", encoding="utf-8") as f:
             ground_truth_content = f.read()
 
-        prompt = (
-            "You are a DSPM validation engine.\n"
-            "You will be given two inputs:\n"
-            "1. client_result.json – scan results from the Normalyze platform.\n"
-            "2. groundTruthFile – raw test data with labeled entities.\n\n"
-            "Your task: Revalidate the client results against the ground truth file.\n"
-            "Rules:\n"
-            "- Compare each entity type (datatype).\n"
-            "- If detected counts match ground truth → status=MATCHED.\n"
-            "- If fewer detections than ground truth → status=UNDER_DETECTED.\n"
-            "- If more detections than ground truth → status=OVER_DETECTED.\n"
-            "- If entity is in ground truth but not in client results → status=NOT_DETECTED.\n"
-            "- If entity reported by client but not in ground truth → status=FALSE_POSITIVE.\n\n"
-            "Return ONLY strict JSON. No code fences, no markdown, no comments.\n"
-            "JSON schema required:\n"
-            "{\n"
-            "  \"validationSummary\": {\n"
-            "    \"totalEntitiesInGroundTruth\": <number>,\n"
-            "    \"totalEntitiesDetectedByClient\": <number>,\n"
-            "    \"matchedEntities\": <number>,\n"
-            "    \"underDetectedEntities\": <number>,\n"
-            "    \"overDetectedEntities\": <number>,\n"
-            "    \"notDetectedEntities\": <number>,\n"
-            "    \"falsePositives\": <number>\n"
-            "  },\n"
-            "  \"entityValidation\": [\n"
-            "    {\n"
-            "      \"datatype\": \"<entity name>\",\n"
-            "      \"groundTruthCount\": <number>,\n"
-            "      \"clientDetectedCount\": <number>,\n"
-            "      \"status\": \"MATCHED\" | \"UNDER_DETECTED\" | \"OVER_DETECTED\" | \"NOT_DETECTED\" | \"FALSE_POSITIVE\"\n"
-            "    }\n"
-            "  ]\n"
-            "}\n\n"
-            "Client Result JSON:\n" + client_result_content + "\n\n"
-            "Ground Truth File:\n" + ground_truth_content + "\n"
-        )
+ # Try this simplified version first to test if JSON parsing works:
 
+        prompt = (
+            "You are an expert in report generation for Data Security Posture Management (DSPM) solutions.\n"
+            "You will receive two sets of structured input:\n"
+            "1. Input Test Data file (ground truth) containing sensitive entities.\n"
+            "2. API Scan Data file (detected entities from the DSPM product).\n"
+            "Your task is to analyze the data and create a professional, client-facing report structure.\n"
+            "The report must always include the following sections:\n"
+            "---\n"
+            "Section 1 – Input Test Data Summary\n"
+            "- Analyze the ground truth data and extract each entity type with its count.\n"
+            "- Calculate the total entities count.\n"
+            "Section 2 – API Scan Summary\n"
+            "- Analyze the API scan results and extract each entity type with its count.\n"
+            "- Calculate the total entities count.\n"
+            "Section 3 – DSPM Comparison Results\n"
+            "- Create high-level comparison metrics:\n"
+            "  * Total Entities in Input\n"
+            "  * Entities Detected by API\n"
+            "  * Matched Entities (entities correctly detected)\n"
+            "  * Missed Entities (False Negatives - in input but not detected)\n"
+            "  * Extra Detected (False Positives - detected but not in input)\n"
+            "  * Accuracy % (calculated as Matched / Total Input * 100)\n"
+            "- Create entity-level breakdown comparing Input Count, API Count, Matched, Missed, Extra for each entity type.\n"
+            "Section 4 – Validation Results (Detailed Entity Validation)\n"
+            "- For each individual entity value found in either dataset, create validation entries with:\n"
+            "  * Sequential number\n"
+            "  * Entity name/value\n"
+            "  * Whether it's sensitive (Yes for PII/sensitive data, No otherwise)\n"
+            "  * Whether detected by scanner (Yes/No)\n"
+            "  * Whether present in input data (Yes/No)\n"
+            "  * Result status (PASS/FAIL)\n"
+            "- Mark as PASS if both input and API agree on detection status.\n"
+            "- Mark as FAIL if:\n"
+            "  * Input contains it but API missed → FAIL (Missed Detection)\n"
+            "  * API detected but input did not contain it → FAIL (False Positive)\n"
+            "  * API flagged non-sensitive data as sensitive → FAIL (Incorrectly Flagged)\n"
+            "Section 5 – Observations & Recommendations\n"
+            "- Calculate and summarize overall accuracy percentage\n"
+            "- Identify entity types with highest accuracy\n"
+            "- Identify entity types with most false negatives (missed detections)\n"
+            "- Identify entity types with most false positives (incorrect detections)\n"
+            "- Provide specific, actionable recommendations for improvement\n"
+            "---\n"
+            "**Important Analysis Rules:**\n"
+            "- Always analyze the complete datasets provided\n"
+            "- Calculate all totals and percentages based on actual data\n"
+            "- If an entity type exists in one dataset but not the other, include it with count = 0\n"
+            "- Consider common sensitive data types: SSN, Credit Card, Phone, Email, Address, DOB, etc.\n"
+            "- Base sensitivity classification on standard PII/sensitive data definitions\n"
+            "- Provide actionable recommendations based on specific gaps identified\n"
+            "---\n"
+            "**Critical Output Format Requirement:**\n"
+            "You MUST return ONLY a valid JSON object with this exact structure (no markdown, no code fences, no explanatory text):\n"
+            "{\n"
+            "  \"section1_input_summary\": {\n"
+            "    \"entities\": [\n"
+            "      {\"type\": \"entity_type_name\", \"count\": number}\n"
+            "    ],\n"
+            "    \"total_entities\": number\n"
+            "  },\n"
+            "  \"section2_api_summary\": {\n"
+            "    \"entities\": [\n"
+            "      {\"type\": \"entity_type_name\", \"count\": number}\n"
+            "    ],\n"
+            "    \"total_entities\": number\n"
+            "  },\n"
+            "  \"section3_comparison\": {\n"
+            "    \"high_level\": {\n"
+            "      \"total_input\": number,\n"
+            "      \"detected_by_api\": number,\n"
+            "      \"matched\": number,\n"
+            "      \"missed\": number,\n"
+            "      \"extra\": number,\n"
+            "      \"accuracy_percent\": number\n"
+            "    },\n"
+            "    \"entity_breakdown\": [\n"
+            "      {\n"
+            "        \"entity_type\": \"name\",\n"
+            "        \"input_count\": number,\n"
+            "        \"api_count\": number,\n"
+            "        \"matched\": number,\n"
+            "        \"missed\": number,\n"
+            "        \"extra\": number\n"
+            "      }\n"
+            "    ]\n"
+            "  },\n"
+            "  \"section4_validation\": [\n"
+            "    {\n"
+            "      \"sr_no\": number,\n"
+            "      \"entity_type\": \"type_name\",\n"
+            "      \"entity_value\": \"actual_value_or_identifier\",\n"
+            "      \"sensitive\": \"Yes\" or \"No\",\n"
+            "      \"detected_by_scanner\": \"Yes\" or \"No\",\n"
+            "      \"present_in_input\": \"Yes\" or \"No\",\n"
+            "      \"result\": \"PASS\" or \"FAIL\",\n"
+            "      \"failure_reason\": \"reason if FAIL, empty string if PASS\"\n"
+            "    }\n"
+            "  ],\n"
+            "  \"section5_observations\": {\n"
+            "    \"accuracy_percent\": number,\n"
+            "    \"highest_accuracy_entities\": [\"entity_type1\", \"entity_type2\"],\n"
+            "    \"most_false_negatives\": [\"entity_type1\", \"entity_type2\"],\n"
+            "    \"most_false_positives\": [\"entity_type1\", \"entity_type2\"],\n"
+            "    \"recommendations\": [\n"
+            "      \"Specific actionable recommendation 1\",\n"
+            "      \"Specific actionable recommendation 2\"\n"
+            "    ]\n"
+            "  }\n"
+            "}\n"
+            "---\n"
+            "Input Test Data (Ground Truth):\n" + ground_truth_content + "\n\n"
+            "API Scan Data (Client Results):\n" + client_result_content + "\n"  
+        )
         try:
             # Prefer JSON-mode if supported; fallback otherwise
             response_content = None
@@ -128,7 +205,7 @@ class DSPMValidator:
                         {"role": "system", "content": "You are a DSPM validation specialist. Return strict JSON only."},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=1800,
+                    max_tokens=4000,  # Increased token limit
                     temperature=0,
                     response_format={"type": "json_object"}
                 )
@@ -141,37 +218,72 @@ class DSPMValidator:
                         {"role": "system", "content": "You are a DSPM validation specialist. Return strict JSON only."},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=1800,
+                    max_tokens=4000,  # Increased token limit
                     temperature=0
                 )
                 response_content = response.choices[0].message.content.strip()
 
-            logging.debug(f"Raw AI response for DSPM validation: {response_content[:400]}...")
+            # DEBUG: Print the raw response
+            print("=== RAW AI RESPONSE (first 2000 chars) ===")
+            print(response_content[:2000])
+            print("=== END RAW RESPONSE ===")
 
             # Clean possible code fences, then parse
             cleaned = _strip_code_fences(response_content)
+            
+            # DEBUG: Print cleaned response
+            print("=== CLEANED RESPONSE (first 2000 chars) ===")
+            print(cleaned[:2000])
+            print("=== END CLEANED ===")
+
+            # DEBUG: Check if it looks like JSON
+            cleaned_trimmed = cleaned.strip()
+            if not (cleaned_trimmed.startswith('{') and cleaned_trimmed.endswith('}')):
+                print(f"=== ERROR: Response doesn't look like JSON ===")
+                print(f"Starts with: {cleaned_trimmed[:50]}")
+                print(f"Ends with: {cleaned_trimmed[-50:]}")
+                
+                # Try to find JSON within the response
+                start_brace = cleaned.find('{')
+                end_brace = cleaned.rfind('}')
+                if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+                    print("=== ATTEMPTING TO EXTRACT JSON ===")
+                    extracted_json = cleaned[start_brace:end_brace+1]
+                    print(f"Extracted: {extracted_json[:200]}...")
+                    try:
+                        parsed_response = json.loads(extracted_json)
+                        print("✅ Successfully parsed extracted JSON!")
+                        if pdf_output_path:
+                            self._generate_dspm_report(parsed_response, pdf_output_path)
+                        return parsed_response
+                    except Exception as json_e:
+                        print(f"❌ Failed to parse extracted JSON: {json_e}")
+
             parsed_response = _best_effort_json_parse(cleaned)
 
             if isinstance(parsed_response, dict):
+                print("✅ Successfully parsed JSON response!")
                 if pdf_output_path:
                     self._generate_dspm_report(parsed_response, pdf_output_path)
                 return parsed_response
 
             logging.error("❌ AI response was not valid JSON after cleaning.")
-            return {"error": "Invalid JSON response from AI"}
+            logging.error(f"Response preview: {cleaned[:500]}")
+            return {"error": "Invalid JSON response from AI", "raw_response": cleaned[:1000]}
 
         except Exception as e:
             logging.error(f"❌ Failed to validate client results with AI: {e}")
             return {}
 
     def _generate_dspm_report(self, validation_json: dict, output_path: str):
-        """Generate a DSPM Validation PDF Report from validation results."""
+        """Generate a DSPM Validation PDF Report with 5 sections as per new requirements."""
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         doc = SimpleDocTemplate(output_path, pagesize=A4)
         elements = []
         styles = getSampleStyleSheet()
 
+        # Custom styles
         title_style = ParagraphStyle(
             name="TitleStyle",
             parent=styles["Heading1"],
@@ -189,107 +301,195 @@ class DSPMValidator:
             spaceAfter=20,
         )
 
-        normal_style = styles["Normal"]
-
-        # Title
-        elements.append(Paragraph("DSPM Validation Report", title_style))
+        # Title and header
+        elements.append(Paragraph("DSPM AI Solution – Sensitive Data Detection Report", title_style))
         elements.append(Paragraph("Generated on: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), subtitle_style))
-        elements.append(Spacer(1, 20))
+        elements.append(Spacer(1, 30))
 
-        # Validation Summary
-        summary = validation_json.get("validationSummary", {})
-        elements.append(Paragraph("<b>Validation Summary</b>", styles["Heading2"]))
-        summary_table_data = [
-            ["Total Entities (Ground Truth)", summary.get("totalEntitiesInGroundTruth", 0)],
-            ["Total Entities (Client)", summary.get("totalEntitiesDetectedByClient", 0)],
-            ["Matched Entities", summary.get("matchedEntities", 0)],
-            ["Under Detected", summary.get("underDetectedEntities", 0)],
-            ["Over Detected", summary.get("overDetectedEntities", 0)],
-            ["Not Detected", summary.get("notDetectedEntities", 0)],
-            ["False Positives", summary.get("falsePositives", 0)],
-        ]
-
-        summary_table = Table(summary_table_data, colWidths=[250, 150])
-        summary_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        # Section 1: Input Test Data Summary
+        elements.append(Paragraph("<b>Section 1 – Input Test Data Summary</b>", styles["Heading2"]))
+        section1 = validation_json.get("section1_input_summary", {})
+        
+        input_table_data = [["Entity Type", "Count"]]
+        for entity in section1.get("entities", []):
+            input_table_data.append([entity.get("type", ""), str(entity.get("count", 0))])
+        input_table_data.append(["Total Entities", str(section1.get('total_entities', 0))])
+        
+        input_table = Table(input_table_data, colWidths=[300, 80])
+        input_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
             ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),  # Bold for total row
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
         ]))
-        elements.append(summary_table)
+        elements.append(input_table)
         elements.append(Spacer(1, 20))
 
-        # Detailed Validation Results Table
-        elements.append(Paragraph("<b>Entity Validation Results</b>", styles["Heading2"]))
-        entity_data = [["Entity", "Ground Truth Count", "Client Detected Count", "Status"]]
-        for entity in validation_json.get("entityValidation", []):
-            entity_data.append([
-                entity.get("datatype", ""),
-                str(entity.get("groundTruthCount", 0)),
-                str(entity.get("clientDetectedCount", 0)),
-                entity.get("status", "")
-            ])
-
-        entity_table = Table(entity_data, colWidths=[150, 120, 150, 100])
-        entity_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        # Section 2: API Scan Summary
+        elements.append(Paragraph("<b>Section 2 – API Scan Summary</b>", styles["Heading2"]))
+        section2 = validation_json.get("section2_api_summary", {})
+        
+        api_table_data = [["Entity Type", "Count"]]
+        for entity in section2.get("entities", []):
+            api_table_data.append([entity.get("type", ""), str(entity.get("count", 0))])
+        api_table_data.append(["Total Entities", str(section2.get('total_entities', 0))])
+        
+        api_table = Table(api_table_data, colWidths=[300, 80])
+        api_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgreen),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),  # Bold for total row
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
+        ]))
+        elements.append(api_table)
+        elements.append(Spacer(1, 20))
+
+        # Section 3: DSPM Comparison Results
+        elements.append(Paragraph("<b>Section 3 – DSPM Comparison Results</b>", styles["Heading2"]))
+        section3 = validation_json.get("section3_comparison", {})
+        high_level = section3.get("high_level", {})
+        
+        # High-level comparison table
+        elements.append(Paragraph("<b>High-Level Comparison:</b>", styles["Heading3"]))
+        comparison_table_data = [
+            ["Metric", "Count"],
+            ["Total Entities in Input", str(high_level.get("total_input", 0))],
+            ["Entities Detected by API", str(high_level.get("detected_by_api", 0))],
+            ["Matched Entities (Correct)", str(high_level.get("matched", 0))],
+            ["Missed Entities", str(high_level.get("missed", 0))],
+            ["Extra Detected (False Positives)", str(high_level.get("extra", 0))],
+            ["Accuracy %", f"{high_level.get('accuracy_percent', 0):.1f}%"],
+        ]
+        
+        comparison_table = Table(comparison_table_data, colWidths=[300, 80])
+        comparison_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.orange),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),  # Bold for accuracy row
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.yellow),
+        ]))
+        elements.append(comparison_table)
+        elements.append(Spacer(1, 15))
+
+        # Entity-level breakdown
+        elements.append(Paragraph("<b>Entity-Level Breakdown:</b>", styles["Heading3"]))
+        breakdown_data = [["Entity Type", "Input Count", "API Count", "Matched", "Missed", "Extra"]]
+        for entity in section3.get("entity_breakdown", []):
+            breakdown_data.append([
+                entity.get("entity_type", ""),
+                str(entity.get("input_count", 0)),
+                str(entity.get("api_count", 0)),
+                str(entity.get("matched", 0)),
+                str(entity.get("missed", 0)),
+                str(entity.get("extra", 0))
+            ])
+        
+        breakdown_table = Table(breakdown_data, colWidths=[120, 60, 60, 60, 60, 60])
+        breakdown_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightcyan),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
         ]))
-        elements.append(entity_table)
+        elements.append(breakdown_table)
+        elements.append(Spacer(1, 20))
+
+        # Section 4: Validation Results (Detailed Entity Validation)
         elements.append(PageBreak())
+        elements.append(Paragraph("<b>Section 4 – Validation Results (Detailed Entity Validation)</b>", styles["Heading2"]))
+        
+        validation_data = [["Sr. No", "Entity Type", "Entity Value", "Sensitive", "Detected", "In Input", "Result"]]
+        validation_items = validation_json.get("section4_validation", [])
+        
+        for item in validation_items:
+            entity_value = str(item.get("entity_value", ""))
+            # Truncate long values for better display
+            if len(entity_value) > 25:
+                entity_value = entity_value[:22] + "..."
+            
+            validation_data.append([
+                str(item.get("sr_no", "")),
+                item.get("entity_type", ""),
+                entity_value,
+                item.get("sensitive", ""),
+                item.get("detected_by_scanner", ""),
+                item.get("present_in_input", ""),
+                item.get("result", "")
+            ])
+        
+        validation_table = Table(validation_data, colWidths=[50, 100, 120, 60, 60, 60, 60])
+        
+        # Create base table style
+        table_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.purple),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("TEXTCOLOR", (1, 1), (-1, -1), colors.black),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ]
+        
+        # Add color coding for result column
+        for i, item in enumerate(validation_items, 1):
+            if item.get("result") == "PASS":
+                table_style.append(("BACKGROUND", (6, i), (6, i), colors.lightgreen))
+            else:
+                table_style.append(("BACKGROUND", (6, i), (6, i), colors.lightcoral))
+        
+        validation_table.setStyle(TableStyle(table_style))
+        elements.append(validation_table)
+        elements.append(Spacer(1, 20))
 
-        # Misclassifications & Remediation
-        elements.append(Paragraph("<b>Misclassifications and Remediation Steps</b>", styles["Heading2"]))
-        for entity in validation_json.get("entityValidation", []):
-            status = entity.get("status", "")
-            if status != "MATCHED":
-                elements.append(Paragraph(f"<b>Entity:</b> {entity.get('datatype')}", normal_style))
-                elements.append(Paragraph(f"<b>Issue:</b> {status}", normal_style))
+        # Section 5: Observations & Recommendations
+        elements.append(Paragraph("<b>Section 5 – Observations & Recommendations</b>", styles["Heading2"]))
+        section5 = validation_json.get("section5_observations", {})
+        
+        elements.append(Paragraph(f"<b>Overall Accuracy:</b> {section5.get('accuracy_percent', 0):.1f}%", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        
+        elements.append(Paragraph("<b>Highest Accuracy Entities:</b>", styles["Normal"]))
+        for entity in section5.get("highest_accuracy_entities", []):
+            elements.append(Paragraph(f"• {entity}", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        
+        elements.append(Paragraph("<b>Most False Negatives:</b>", styles["Normal"]))
+        for entity in section5.get("most_false_negatives", []):
+            elements.append(Paragraph(f"• {entity}", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        
+        elements.append(Paragraph("<b>Most False Positives:</b>", styles["Normal"]))
+        for entity in section5.get("most_false_positives", []):
+            elements.append(Paragraph(f"• {entity}", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        
+        elements.append(Paragraph("<b>Recommendations:</b>", styles["Normal"]))
+        for recommendation in section5.get("recommendations", []):
+            elements.append(Paragraph(f"• {recommendation}", styles["Normal"]))
+        elements.append(Spacer(1, 20))
 
-                remediation_steps = []
-                if status == "UNDER_DETECTED":
-                    remediation_steps = [
-                        "Expand regex or ML patterns to capture missed cases.",
-                        "Add additional test samples for edge cases.",
-                        "Re-run detection with updated logic."
-                    ]
-                elif status == "OVER_DETECTED":
-                    remediation_steps = [
-                        "Tighten regex to reduce false matches.",
-                        "Add validation checks for stricter entity matching.",
-                        "Exclude irrelevant substrings or partial matches."
-                    ]
-                elif status == "NOT_DETECTED":
-                    remediation_steps = [
-                        "Implement detection logic for missing entity type.",
-                        "Verify entity is supported in scanning configuration.",
-                        "Enhance training dataset or regex for this datatype."
-                    ]
-                elif status == "FALSE_POSITIVE":
-                    remediation_steps = [
-                        "Review detection logic to reduce noise.",
-                        "Ensure entity definitions are precise.",
-                        "Refine ML model or regex patterns to improve accuracy."
-                    ]
-
-                elements.append(Paragraph("<b>Remediation Steps:</b>", normal_style))
-                for step in remediation_steps:
-                    elements.append(Paragraph(f"- {step}", normal_style))
-                elements.append(Spacer(1, 15))
-
+        # Disclaimer
         disclaimer_text = (
             "AI Disclaimer: This DSPM validation report was generated using AI-based analysis. "
             "The results are based on the provided test data and client scan results. "
             "They may contain inaccuracies. All detections and findings should be manually validated "
             "against the actual data for production use."
         )
-        elements.append(PageBreak())
-        elements.append(Paragraph(disclaimer_text, normal_style))
+        elements.append(Paragraph(disclaimer_text, styles["Normal"]))
 
         doc.build(elements)
         logging.info(f"✅ DSPM Validation Report generated: {output_path}")
