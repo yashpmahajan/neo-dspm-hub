@@ -80,7 +80,6 @@ const Login = () => {
          style={{ background: "var(--login-gradient)" }}>
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center space-y-6 pb-8">
-          <h1 className="text-2xl font-semibold text-neo-blue">Welcome to</h1>
           <div className="flex justify-center">
             <img src={neoDSPMValidatorAgent} alt="neoDSPM Validator Agent" className="h-32 w-auto" />
           </div>
