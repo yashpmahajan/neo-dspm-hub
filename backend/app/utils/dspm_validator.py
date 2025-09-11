@@ -136,6 +136,7 @@ class DSPMValidator:
             "- Consider common sensitive data types: SSN, Credit Card, Phone, Email, Address, DOB, etc.\n"
             "- Base sensitivity classification on standard PII/sensitive data definitions\n"
             "- Provide actionable recommendations based on specific gaps identified\n"
+            "- Use a clear, well-formatted PDF report with no more than two consecutive blank lines.\n"                                                                          
             "---\n"
             "**Critical Output Format Requirement:**\n"
             "You MUST return ONLY a valid JSON object with this exact structure (no markdown, no code fences, no explanatory text):\n"
@@ -312,8 +313,16 @@ class DSPMValidator:
             elements.append(Spacer(1, 10))
 
         # Title and header
-        elements.append(Paragraph("DSPM AI Solution – Sensitive Data Detection Report", title_style))
-        elements.append(Paragraph("Generated on: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), subtitle_style))
+        elements.append(Paragraph("DSPM AI Validation Report", title_style))
+        created_date_style = ParagraphStyle(
+            name="CreatedDateStyle",
+            parent=styles["Normal"],
+            fontSize=8,
+            alignment=1,
+            textColor=colors.grey,
+            spaceAfter=10,
+        )
+        elements.append(Paragraph("Created on: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), created_date_style))
         elements.append(Spacer(1, 30))
 
         # Section 1: Input Test Data Summary
