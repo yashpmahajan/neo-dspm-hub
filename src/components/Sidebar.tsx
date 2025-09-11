@@ -9,7 +9,8 @@ import {
   HelpCircle, 
   UserPlus, 
   LogOut,
-  ChevronLeft
+  ChevronLeft,
+  Settings as SettingsIcon
 } from "lucide-react";
 import Logo from "./Logo";
 import { Button } from "./ui/button";
@@ -19,7 +20,7 @@ const sidebarItems = [
   { icon: FileText, label: "Report", path: "/report" },
   { icon: HelpCircle, label: "Support", path: "/support" },
   { icon: Key, label: "Set OpenAI API Key", path: "/api-key" },
-  { icon: Key, label: "Settings", path: "/settings" },
+  { icon: SettingsIcon, label: "Settings", path: "/settings" },
 ];
 
 const Sidebar = () => {
