@@ -428,7 +428,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-8">
-      <div className="mb-8 flex flex-col items-center">
+      <div className="mb-8 ">
         <h1 className="text-3xl font-bold text-neo-blue">
           Data Security Posture Management
         </h1>
@@ -526,10 +526,10 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-6 w-6 text-primary" />
-              Upload Generated Data To S3
+              Upload Generated Data To Cloud Datastore
             </CardTitle>
             <CardDescription>
-              Upload the generated data file to your AWS S3 bucket.
+              Upload the generated data file to your cloud datastore.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
