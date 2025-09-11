@@ -103,21 +103,22 @@ def generate_data(
         media_type = "application/json"
 
     elif filetype == "csv":
-        fieldnames = ["cardHolderName", "cardNumber", "expirationDate", "cvv", "cardType", "billingAddress"]
+        fieldnames = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", "passportNumber", "dateOfBirth", "address"]
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for row in processed_data:
-                billing_address = row.get("billingAddress", "")
-                if isinstance(billing_address, dict):
-                    billing_address = ", ".join(f"{k}: {v}" for k, v in billing_address.items())
+                address = row.get("address", "")
+                if isinstance(address, dict):
+                    address = ", ".join(f"{k}: {v}" for k, v in address.items())
                 writer.writerow({
-                    "cardHolderName": row.get("cardHolderName", ""),
-                    "cardNumber": row.get("cardNumber", ""),
-                    "expirationDate": row.get("expirationDate", ""),
-                    "cvv": row.get("cvv", ""),
-                    "cardType": row.get("cardType", ""),
-                    "billingAddress": billing_address,
+                    "fullName": row.get("fullName", ""),
+                    "email": row.get("email", ""),
+                    "ssnNumber": row.get("ssnNumber", ""),
+                    "drivingLicenseNumber": row.get("drivingLicenseNumber", ""),
+                    "passportNumber": row.get("passportNumber", ""),
+                    "dateOfBirth": row.get("dateOfBirth", ""),
+                    "address": address,
                 })
         media_type = "text/csv"
 
@@ -126,19 +127,19 @@ def generate_data(
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
         pdf.set_font("Arial", style="B", size=14)
-        pdf.cell(0, 10, txt="Generated Credit Card Test Data", ln=1)
+        pdf.cell(0, 10, txt="Generated Personal Information Test Data", ln=1)
         pdf.ln(3)
 
         for idx, entry in enumerate(processed_data, start=1):
             pdf.set_font("Arial", style="B", size=12)
             pdf.cell(0, 8, txt=f"Entry {idx}", ln=1)
             pdf.set_font("Arial", size=11)
-            for key in ["cardHolderName", "cardNumber", "expirationDate", "cvv", "cardType", "billingAddress"]:
+            for key in ["fullName", "email", "ssnNumber", "drivingLicenseNumber", "passportNumber", "dateOfBirth", "address"]:
                 value = entry.get(key, "")
                 if isinstance(value, dict):
                     value = ", ".join(f"{k}: {v}" for k, v in value.items())
                 pdf.set_font("Arial", style="B", size=11)
-                pdf.cell(40, 8, txt=f"{key}:", ln=0)
+                pdf.cell(40, 8, txt=f"{key}: ", ln=0)  # Added space after colon
                 pdf.set_font("Arial", size=11)
                 pdf.multi_cell(0, 8, txt=str(value))
             pdf.ln(3)
