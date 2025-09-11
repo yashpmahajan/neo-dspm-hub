@@ -432,9 +432,6 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold text-foreground">
           Data Security Posture Management
         </h1>
-        <p className="text-muted-foreground mt-2">
-          Follow the workflow from left to right, top to bottom
-        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl">
@@ -443,10 +440,12 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-6 w-6 text-primary" />
-              Generate Synthetic Data
+              Generate Data
             </CardTitle>
             <CardDescription>
-              Generate fake personal information for testing.
+              <div>
+                Generate realistic data via LLM.
+              </div>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -527,7 +526,7 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-6 w-6 text-primary" />
-              Upload to S3
+              Upload Generated Data To S3
             </CardTitle>
             <CardDescription>
               Upload the generated data file to your AWS S3 bucket.
@@ -575,12 +574,12 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Scan className="h-6 w-6 text-primary" />
-              Run Scan
+              Run Data Scan
             </CardTitle>
             <CardDescription>
               {!isScanExpanded && !isScanning && !scanCompleted 
-                ? "Click to configure and start a new scan"
-                : "Configure and run scan for sensitive data patterns."
+                ? "Click to trigger a new data scan"
+                : "Use Valid API cURL commands to run the scan"
               }
             </CardDescription>
           </CardHeader>
@@ -602,30 +601,30 @@ const Dashboard = () => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="bearerTokenCurl">Bearer Token Curl *</Label>
+                      <Label htmlFor="bearerTokenCurl">Bearer Token API *</Label>
                       <Textarea
                         id="bearerTokenCurl"
-                        placeholder="Enter bearer token curl command"
+                        placeholder="Enter bearer token API cURL command"
                         value={scanFormData.bearerTokenCurl}
                         onChange={(e) => handleScanFormChange('bearerTokenCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="scanTriggerCurl">Scan Data Curl *</Label>
+                      <Label htmlFor="scanTriggerCurl">Data Scanning API *</Label>
                       <Textarea
                         id="scanTriggerCurl"
-                        placeholder="Enter scan data curl command"
+                        placeholder="Enter data scanning API cURL command"
                         value={scanFormData.scanTriggerCurl}
                         onChange={(e) => handleScanFormChange('scanTriggerCurl', e.target.value)}
                         className="min-h-[100px]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="clientResultCurl">Fetch Inventory Curl *</Label>
+                      <Label htmlFor="clientResultCurl">Fetch Inventory Data API *</Label>
                       <Textarea
                         id="clientResultCurl"
-                        placeholder="Enter fetch inventory curl command"
+                        placeholder="Enter fetch inventory data cURL command"
                         value={scanFormData.clientResultCurl}
                         onChange={(e) => handleScanFormChange('clientResultCurl', e.target.value)}
                         className="min-h-[100px]"
@@ -718,3 +717,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import Logo from "@/components/Logo";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import neoDSPMValidatorAgent from "@/assets/neoDSPMValidatorAgent.png";
 
 const Login = () => {
   const [userId, setUserId] = useState("");
@@ -82,14 +82,14 @@ const Login = () => {
         <CardHeader className="text-center space-y-6 pb-8">
           <h1 className="text-2xl font-semibold text-neo-blue">Welcome to</h1>
           <div className="flex justify-center">
-            <Logo />
+            <img src={neoDSPMValidatorAgent} alt="neoDSPM Validator Agent" className="h-32 w-auto" />
           </div>
           <p className="text-lg font-medium text-muted-foreground">
-            An AI-Powered Cloud Compliance Solution
+            An AI-Powered DSPM Validator Solution
           </p>
-          <p className="text-sm text-muted-foreground">
-            Login to begin using neoDSPM
-          </p>
+          {/*<p className="text-sm text-muted-foreground">*/}
+          {/*  Login to begin using neoDSPM*/}
+          {/*</p>*/}
         </CardHeader>
         
         <CardContent className="space-y-6">
