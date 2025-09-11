@@ -130,18 +130,30 @@ def generate_data(
         pdf.cell(0, 10, txt="Generated Personal Information Test Data", ln=1)
         pdf.ln(3)
 
+        keys = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", 
+                "passportNumber", "dateOfBirth", "address"]
+        
+        # Dynamically calculate the widest key
+        max_key_width = max(pdf.get_string_width(key + ":") for key in keys) + 5
+
         for idx, entry in enumerate(processed_data, start=1):
             pdf.set_font("Arial", style="B", size=12)
             pdf.cell(0, 8, txt=f"Entry {idx}", ln=1)
             pdf.set_font("Arial", size=11)
-            for key in ["fullName", "email", "ssnNumber", "drivingLicenseNumber", "passportNumber", "dateOfBirth", "address"]:
+
+            for key in keys:
                 value = entry.get(key, "")
                 if isinstance(value, dict):
                     value = ", ".join(f"{k}: {v}" for k, v in value.items())
+
+                # Key column
                 pdf.set_font("Arial", style="B", size=11)
-                pdf.cell(40, 8, txt=f"{key}: ", ln=0)  # Added space after colon
+                pdf.cell(max_key_width, 8, txt=f"{key}:", ln=0)
+
+                # Value column (wrapped if too long)
                 pdf.set_font("Arial", size=11)
                 pdf.multi_cell(0, 8, txt=str(value))
+
             pdf.ln(3)
 
         pdf.output(filename)
