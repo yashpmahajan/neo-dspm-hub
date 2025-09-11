@@ -509,7 +509,7 @@ class DSPMValidator:
     def _add_footer(self, canvas, doc):
         # Short, clear AI disclaimer for the footer
         footer_text = (
-            "Disclaimer: This DSPM validation report was AI-generated based on test data and client scan results. "
+            "Disclaimer: This DSPM validation report was AI-generated based on test data and client scan results.\n"
             "Findings may contain inaccuracies and should be manually verified against actual data before production use."
         )
         canvas.saveState()
@@ -517,5 +517,6 @@ class DSPMValidator:
         width, height = A4
         margin = 40
         canvas.setFillColorRGB(0.3, 0.3, 0.3)
-        canvas.drawString(margin, 20, footer_text)
+        for i, line in enumerate(footer_text.split("\n")):
+            canvas.drawString(margin, 20 + i * 10, line)
         canvas.restoreState()
