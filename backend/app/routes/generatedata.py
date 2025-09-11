@@ -17,9 +17,9 @@ os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 # Strict financial test card generation prompt
 CARD_PROMPT = (
     "You are a data generation expert. Generate exactly 3 highly realistic, unique, and plausible personal information records in strict JSON array format. "
-    "Each record must include the following fields: firstName, lastName, email, ssnNumber, drivingLicenseNumber, passportNumber, dateOfBirth, and address. "
+    "Each record must include the following fields:fullName, email, ssnNumber, drivingLicenseNumber, passportNumber, dateOfBirth, and address. "
     "Requirements for each field:\n"
-    "- firstName, lastName: Use common, natural names (avoid placeholders or obviously fake names).\n"
+    "- fullName: Use common, natural full names (first and last together, avoid placeholders or obviously fake names).\n"
     "- email: Use realistic formats and common domains (e.g., gmail.com, yahoo.com, outlook.com, live.com), but do not use real or existing addresses. Do not use 'test', 'example', or similar dummy values.\n"
     "- ssnNumber: Use the format NNN-NN-NNNN, but do NOT use obvious dummy values (e.g., 123-45-6789, 987-65-4321, or any sequential/repetitive numbers). Use plausible, random numbers that look authentic.\n"
     "- drivingLicenseNumber: Format as two uppercase state initials followed by 6 digits (e.g., 'CA548745'). Use valid US state abbreviations. Do not use obvious patterns or dummy numbers.\n"
