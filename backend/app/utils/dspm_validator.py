@@ -483,14 +483,21 @@ class DSPMValidator:
             elements.append(Paragraph(f"• {recommendation}", styles["Normal"]))
         elements.append(Spacer(1, 20))
 
-        # Disclaimer
-        disclaimer_text = (
-            "AI Disclaimer: This DSPM validation report was generated using AI-based analysis. "
-            "The results are based on the provided test data and client scan results. "
-            "They may contain inaccuracies. All detections and findings should be manually validated "
-            "against the actual data for production use."
-        )
-        elements.append(Paragraph(disclaimer_text, styles["Normal"]))
-
-        doc.build(elements)
+        # Remove the disclaimer paragraph from the main content
+        # doc.build will add the disclaimer only as a footer
+        doc.build(elements, onFirstPage=self._add_footer, onLaterPages=self._add_footer)
         logging.info(f"✅ DSPM Validation Report generated: {output_path}")
+
+    def _add_footer(self, canvas, doc):
+        # Short, clear AI disclaimer for the footer
+        footer_text = (
+            "Disclaimer: This DSPM validation report was AI-generated based on test data and client scan results. "
+            "Findings may contain inaccuracies and should be manually verified against actual data before production use."
+        )
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        width, height = A4
+        margin = 40
+        canvas.setFillColorRGB(0.3, 0.3, 0.3)
+        canvas.drawString(margin, 20, footer_text)
+        canvas.restoreState()
