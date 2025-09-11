@@ -6,9 +6,10 @@ from typing import Dict, Any
 
 from openai import OpenAI
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Table, TableStyle,
-    Paragraph, Spacer, PageBreak
+    Paragraph, Spacer, PageBreak, Image
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -301,6 +302,14 @@ class DSPMValidator:
             alignment=1,
             spaceAfter=20,
         )
+
+        # Add Neova Solutions logo to top right
+        logo_path = os.path.join(os.path.dirname(__file__), '../assets/logos/neova_solutions.png')
+        if os.path.exists(logo_path):
+            logo_img = Image(logo_path, width=2.2 * inch, height=1.1 * inch, kind='proportional')
+            logo_img.hAlign = 'RIGHT'
+            elements.append(logo_img)
+            elements.append(Spacer(1, 10))
 
         # Title and header
         elements.append(Paragraph("DSPM AI Solution – Sensitive Data Detection Report", title_style))
