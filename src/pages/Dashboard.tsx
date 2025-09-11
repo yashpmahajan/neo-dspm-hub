@@ -112,6 +112,10 @@ const Dashboard = () => {
       { name: "Bob Johnson", email: "bob.johnson@email.com", phone: "(555) 456-7890", ssn: "***-**-9012" },
     ];
     setSyntheticData(mockData);
+    toast({
+      title: "Data generated successfully",
+      description: "Data has been generated.",
+    });
   };
 
   // Generate data using backend API
@@ -138,10 +142,10 @@ const Dashboard = () => {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
+
         toast({
-          title: "File generated successfully",
-          description: `${filetype.toUpperCase()} file has been downloaded`,
+          title: "Data generated successfully",
+          description: `Data generated successfully and saved to ${filetype.toUpperCase()} file`,
         });
       } else {
         throw new Error('Failed to generate file');
@@ -293,7 +297,7 @@ const Dashboard = () => {
         
         toast({
           title: "Scan completed",
-          description: "PII scan has been completed successfully",
+          description: "Cloud Scan completed successfully",
         });
       })
       .catch((error) => {
@@ -650,7 +654,7 @@ const Dashboard = () => {
                   
                   <div className="text-center space-y-2">
                     <p className="text-sm font-medium">🔄 Scan in progress...</p>
-                    <p className="text-xs text-muted-foreground">This may take up to 15 minutes. Please keep this tab open.</p>
+                    <p className="text-xs text-muted-foreground">Cloud Scan In Progress. Do Not Go Back Or Refresh the Page.</p>
                   </div>
                 </div>
               </>
@@ -672,11 +676,22 @@ const Dashboard = () => {
                       <Download className="h-4 w-4 mr-2" />
                       Download Report
                     </Button>
-                    <Button onClick={downloadArtifacts} variant="outline" className="w-full">
+                    <Button onClick={downloadArtifacts} className="w-full">
                       <Download className="h-4 w-4 mr-2" />
                       Download Artifacts
                     </Button>
                   </div>
+                  <Button
+                    onClick={() => {
+                      setIsScanExpanded(true);
+                      setScanCompleted(false);
+                      setIsScanning(false);
+                      setScanStep(1);
+                    }}
+                    className="w-full mt-2"
+                  >
+                    Re-Run Scan
+                  </Button>
                 </div>
               </>
             ) : null}
