@@ -21,6 +21,19 @@ class ApiKeyRequest(BaseModel):
 	username: str
 	apikey: str
 
+class BlobCredsRequest(BaseModel):
+	account_name: str
+	account_key: str
+	container_name: str
+
+class RdsCredsRequest(BaseModel):
+	host: str
+	port: int
+	username: str
+	password: str
+	database: str
+	engine: str
+
 @router.post("/store-aws-creds")
 def store_aws_creds(data: AwsCredsRequest):
 	# Update .env in NEO-DSPM-HUB root directory
@@ -53,3 +66,51 @@ def store_apikey(data: ApiKeyRequest):
 	if result.matched_count == 0:
 		raise HTTPException(status_code=404, detail="User not found")
 	return {"message": "API key stored successfully"}
+
+
+	
+@router.post("/store-blob-creds")
+def store_blob_creds(data: BlobCredsRequest):
+	# Update .env in NEO-DSPM-HUB root directory
+	env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.env'))
+	env_lines = []
+	if os.path.exists(env_path):
+		with open(env_path, 'r') as f:
+			env_lines = f.readlines()
+	env_dict = {}
+	for line in env_lines:
+		if '=' in line:
+			k, v = line.strip().split('=', 1)
+			env_dict[k] = v
+	env_dict['AZURE_STORAGE_ACCOUNT_NAME'] = data.account_name
+	env_dict['AZURE_STORAGE_ACCOUNT_KEY'] = data.account_key
+	env_dict['AZURE_BLOB_CONTAINER'] = data.container_name
+	with open(env_path, 'w') as f:
+		for k, v in env_dict.items():
+			f.write(f'{k}={v}\n')
+	return {"message": ".env file in NEO-DSPM-HUB updated with Azure Blob credentials successfully"}
+ 
+ 
+@router.post("/store-rds-creds")
+def store_rds_creds(data: RdsCredsRequest):
+	# Update .env in NEO-DSPM-HUB root directory
+	env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.env'))
+	env_lines = []
+	if os.path.exists(env_path):
+		with open(env_path, 'r') as f:
+			env_lines = f.readlines()
+	env_dict = {}
+	for line in env_lines:
+		if '=' in line:
+			k, v = line.strip().split('=', 1)
+			env_dict[k] = v
+	env_dict['RDS_HOST'] = data.host
+	env_dict['RDS_PORT'] = str(data.port)
+	env_dict['RDS_USERNAME'] = data.username
+	env_dict['RDS_PASSWORD'] = data.password
+	env_dict['RDS_DB_NAME'] = data.database
+	env_dict['RDS_ENGINE'] = data.engine
+	with open(env_path, 'w') as f:
+		for k, v in env_dict.items():
+			f.write(f'{k}={v}\n')
+	return {"message": ".env file in NEO-DSPM-HUB updated with RDS credentials successfully"}
