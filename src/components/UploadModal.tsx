@@ -66,7 +66,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
         ];
       case 'rds':
         return [
-          { key: 'RDS_ENDPOINT', label: 'RDS Endpoint', placeholder: 'Enter your RDS endpoint' },
+          { key: 'RDS_HOST', label: 'RDS Host', placeholder: 'Enter your RDS host' },
           { key: 'RDS_PORT', label: 'RDS Port', placeholder: 'e.g., 3306 or 5432' },
           { key: 'RDS_USERNAME', label: 'RDS Username', placeholder: 'Enter your RDS username' },
           { key: 'RDS_PASSWORD', label: 'RDS Password', placeholder: 'Enter your RDS password' },
