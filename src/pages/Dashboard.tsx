@@ -29,6 +29,7 @@ import {
   Loader2,
   RotateCcw
 } from "lucide-react";
+import { UploadModal } from "@/components/UploadModal";
 
 const Dashboard = () => {
   const [syntheticData, setSyntheticData] = useState<any[]>([]);
@@ -48,6 +49,7 @@ const Dashboard = () => {
     scanTriggerCurl: '',
     clientResultCurl: ''
   });
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const { toast } = useToast();
 
   // LocalStorage keys for persistence
@@ -165,21 +167,25 @@ const Dashboard = () => {
   const generateDataAsCSV = () => generateDataFile('csv');
   const generateDataAsJSON = () => generateDataFile('json');
 
-  // Upload to S3 using backend API  
-  const uploadToS3 = async (filetype: 'pdf' | 'csv' | 'json') => {
+  // Upload to cloud storage using backend API with credentials
+  const handleUpload = async (provider: string | null, credentials: Record<string, string>) => {
     setIsUploading(true);
     setUploadStatus('idle');
     
     try {
       const token = localStorage.getItem("authToken");
-      const formData = new FormData();
-      
       const backendApi = import.meta.env.VITE_BACKEND_API;
+      
       const response = await fetch(`${backendApi}/upload-env-bucket`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          provider,
+          credentials
+        }),
       });
 
       const result = await response.json();
@@ -187,9 +193,10 @@ const Dashboard = () => {
       if (response.ok) {
         setUploadStatus('success');
         setUploadedFileUrl(result.file_url);
+        setIsUploadModalOpen(false);
         toast({
           title: "Upload successful",
-          description: `${filetype.toUpperCase()} file uploaded to S3`,
+          description: `File uploaded to ${provider?.toUpperCase()} successfully`,
         });
       } else {
         throw new Error(result.detail || 'Upload failed');
@@ -538,13 +545,20 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
-              onClick={() => uploadToS3('pdf')}
+              onClick={() => setIsUploadModalOpen(true)}
               className="w-full"
               disabled={isUploading}
             >
               {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               Upload
             </Button>
+
+            <UploadModal
+              open={isUploadModalOpen}
+              onOpenChange={setIsUploadModalOpen}
+              onUpload={handleUpload}
+              isUploading={isUploading}
+            />
 
             {uploadStatus === "success" && (
               <div className="space-y-2">
