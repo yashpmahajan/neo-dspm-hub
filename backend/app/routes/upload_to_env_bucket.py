@@ -1,21 +1,12 @@
 from fastapi import APIRouter, HTTPException
 import os
-import boto3
 
-def clear_bucket(s3, bucket_name):
-    # Delete all objects in the bucket
-    try:
-        objects = s3.list_objects_v2(Bucket=bucket_name)
-        if 'Contents' in objects:
-            for obj in objects['Contents']:
-                s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear bucket: {e}")
-
+from app.utils import database_helper as dbh
 
 router = APIRouter()
 
 SAVE_DIR = "app/generated_files"
+
 
 @router.post("/upload-env-bucket")
 def upload_env_bucket():
@@ -28,35 +19,31 @@ def upload_env_bucket():
     #     raise HTTPException(status_code=500, detail="AWS credentials or bucket name not set in ENV.")
 
     # Find the first generated file
-    filetype = None
-    filename = None
-    for ext in ["json", "pdf", "csv"]:
-        test_path = os.path.join(SAVE_DIR, f"data.{ext}")
-        if os.path.exists(test_path):
-            filetype = ext
-            filename = test_path
-            break
+    filetype, filename = dbh.get_first_generated_file(SAVE_DIR)
     if not filetype or not filename:
         raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
 
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION
+    s3 = dbh.s3_create(
+        AWS_ACCESS_KEY_ID,
+        AWS_SECRET_ACCESS_KEY,
+        AWS_REGION,
     )
 
     # Clear all files in the bucket before uploading
-    clear_bucket(s3, AWS_BUCKET_NAME)
+    try:
+        dbh.s3_clear_bucket(s3, AWS_BUCKET_NAME)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear bucket: {e}")
 
     s3_key = f"data.{filetype}"
     try:
-        s3.upload_file(filename, AWS_BUCKET_NAME, s3_key)
+        dbh.s3_upload_file(s3, AWS_BUCKET_NAME, filename, s3_key)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to S3: {e}")
 
     file_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
     return {"msg": "File uploaded successfully", "bucket_name": AWS_BUCKET_NAME, "file_url": file_url}
+
 
 @router.post("/upload-blob-storage")
 def upload_to_blob_storage():
@@ -67,14 +54,7 @@ def upload_to_blob_storage():
     AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
 
     # Find the first generated file
-    filetype = None
-    filename = None
-    for ext in ["json", "pdf", "csv"]:
-        test_path = os.path.join(SAVE_DIR, f"data.{ext}")
-        if os.path.exists(test_path):
-            filetype = ext
-            filename = test_path
-            break
+    filetype, filename = dbh.get_first_generated_file(SAVE_DIR)
     if not filetype or not filename:
         raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
 
@@ -89,7 +69,7 @@ def upload_to_blob_storage():
 
     try:
         account_url = f"https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net"
-        service_client = BlobServiceClient(account_url=account_url, credential=AZURE_ACCOUNT_KEY)
+        service_client = dbh.blob_service_client_create(AZURE_ACCOUNT_NAME, AZURE_ACCOUNT_KEY)
         container_client = service_client.get_container_client(AZURE_CONTAINER_NAME)
 
         # Ensure container exists (will raise if account/container invalid)
@@ -99,16 +79,13 @@ def upload_to_blob_storage():
 
         # Clear existing blobs in the container
         try:
-            blobs = container_client.list_blobs()
-            for blob in blobs:
-                container_client.delete_blob(blob.name)
+            dbh.clear_container_blobs(container_client)
         except Exception:
             # If deletion fails, continue and attempt upload; bubble up if needed
             pass
 
         blob_name = f"data.{filetype}"
-        with open(filename, "rb") as data:
-            container_client.upload_blob(name=blob_name, data=data, overwrite=True)
+        dbh.upload_blob_from_file(container_client, blob_name, filename, overwrite=True)
 
     except HTTPException:
         raise
