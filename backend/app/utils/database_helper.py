@@ -1,4 +1,5 @@
 # File: app/utils/database_helper.py
+from http.client import HTTPException
 import os
 import boto3
 
@@ -63,3 +64,78 @@ def upload_blob_from_file(container_client, blob_name: str, filename: str, overw
         container_client.upload_blob(name=blob_name, data=data, overwrite=overwrite)
 
 
+def get_rds_endpoint_from_aws(db_identifier: str,
+                              aws_access_key_id: str = None,
+                              aws_secret_access_key: str = None,
+                              aws_session_token: str = None,
+                              region_name: str = None,
+                              timeout_seconds: int = 10):
+    """
+    Return (host, port) for the given DB instance identifier by calling AWS RDS.
+    Raises HTTPException on error.
+    """
+    try:
+        from botocore.config import Config
+        from botocore.exceptions import BotoCoreError, ClientError
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"boto3 required for RDS discovery: {e}")
+
+    # region fallback: use provided or env or default to us-east-1
+    region = region_name or os.getenv("AWS_REGION") or "us-east-1"
+
+    # Create client using explicit creds if provided, otherwise boto3 uses env/profile/role
+    try:
+        client = boto3.client(
+            "rds",
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
+            region_name=region,
+            config=Config(connect_timeout=timeout_seconds, read_timeout=timeout_seconds),
+        )
+    except (BotoCoreError, ClientError) as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create boto3 RDS client: {e}")
+
+    # Try describe_db_instances first (covers non-Aurora and single-instance Aurora)
+    try:
+        resp = client.describe_db_instances(DBInstanceIdentifier=db_identifier)
+        instances = resp.get("DBInstances", [])
+        if not instances:
+            raise HTTPException(status_code=404, detail=f"No DBInstances found for identifier: {db_identifier}")
+        endpoint = instances[0].get("Endpoint")
+        if endpoint and endpoint.get("Address"):
+            return endpoint["Address"], int(endpoint.get("Port", 5432))
+    except ClientError as e:
+        # If not found or not permitted, we'll try describe_db_clusters fallback
+        err_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+        if err_code not in ("DBInstanceNotFound",):
+            # if permission denied or other errors, raise
+            if err_code == "AccessDenied":
+                raise HTTPException(status_code=403, detail=f"AWS access denied for DescribeDBInstances: {e}")
+            # else continue to try clusters
+    except Exception as e:
+        # proceed to try clusters as fallback
+        pass
+
+    # Fallback: describe DB clusters (Aurora)
+    try:
+        resp = client.describe_db_clusters(DBClusterIdentifier=db_identifier)
+        clusters = resp.get("DBClusters", [])
+        if clusters:
+            # prefer Endpoint if present, else ReaderEndpoint
+            cluster = clusters[0]
+            endpoint_addr = cluster.get("Endpoint") or cluster.get("ReaderEndpoint")
+            port = cluster.get("Port", 3306)  # default guess: depends on engine
+            if endpoint_addr:
+                return endpoint_addr, int(port)
+    except ClientError as e:
+        # If cluster not found, rethrow a clearer message
+        err_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+        if err_code == "DBClusterNotFoundFault":
+            raise HTTPException(status_code=404, detail=f"No RDS instance or cluster found with identifier: {db_identifier}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Error describing DB clusters: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error discovering RDS endpoint: {e}")
+
+    raise HTTPException(status_code=404, detail=f"Could not discover endpoint for identifier: {db_identifier}")
