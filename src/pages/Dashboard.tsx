@@ -35,7 +35,8 @@ const Dashboard = () => {
   const [syntheticData, setSyntheticData] = useState<any[]>([]);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scanResults, setScanResults] = useState<string | null>(null);
-  const [generateDataBtnDisabled, setGenerateDataBtnDisabled] = useState(false);
+  const [selectedDataType, setSelectedDataType] = useState<string>('');
+  const [selectedExportFormat, setSelectedExportFormat] = useState<'pdf' | 'csv' | 'json' | ''>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
@@ -121,12 +122,16 @@ const Dashboard = () => {
   };
 
   // Generate data using backend API
-  const generateDataFile = async (filetype: 'pdf' | 'csv' | 'json') => {
+  const generateDataFile = async () => {
+    if (!selectedDataType || !selectedExportFormat) {
+      return;
+    }
+    
     setIsGenerating(true);
     try {
       const token = localStorage.getItem("authToken");
       const backendApi = import.meta.env.VITE_BACKEND_API;
-      const response = await fetch(`${backendApi}/generatedata?filetype=${filetype}`, {
+      const response = await fetch(`${backendApi}/generatedata?filetype=${selectedExportFormat}&datatype=${encodeURIComponent(selectedDataType)}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -139,7 +144,7 @@ const Dashboard = () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `data.${filetype}`;
+        a.download = `data.${selectedExportFormat}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -147,7 +152,7 @@ const Dashboard = () => {
 
         toast({
           title: "Data generated successfully",
-          description: `Data generated successfully and saved to ${filetype.toUpperCase()} file`,
+          description: `${selectedDataType} data generated and saved to ${selectedExportFormat.toUpperCase()} file`,
         });
       } else {
         throw new Error('Failed to generate file');
@@ -155,17 +160,13 @@ const Dashboard = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to generate ${filetype.toUpperCase()} file`,
+        description: `Failed to generate ${selectedExportFormat.toUpperCase()} file`,
         variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
     }
   };
-
-  const generateDataAsPDF = () => generateDataFile('pdf');
-  const generateDataAsCSV = () => generateDataFile('csv');
-  const generateDataAsJSON = () => generateDataFile('json');
 
   // Upload to cloud storage using backend API with credentials
   const handleUpload = async (provider: string | null, credentials: Record<string, string>) => {
@@ -413,7 +414,8 @@ const Dashboard = () => {
     setSyntheticData([]);
     setUploadStatus('idle');
     setScanResults(null);
-    setGenerateDataBtnDisabled(false);
+    setSelectedDataType('');
+    setSelectedExportFormat('');
     setIsGenerating(false);
     setIsUploading(false);
     setUploadedFileUrl('');
@@ -460,52 +462,86 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* <Button onClick={generateSyntheticData} className="w-full">
-              Generate Data
-            </Button> */}
-            <Button
-              onClick={() => setGenerateDataBtnDisabled(true)}
-              className="w-full"
-            >
-              Generate Data
-            </Button>
+            {/* Data Type Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Data Type</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'PII Data',
+                  'Financial / Credit Card Data',
+                  'Employee / HR Data',
+                  'Healthcare / Medical Records',
+                  'Government Data',
+                  'Insurance Data'
+                ].map((type) => (
+                  <Button
+                    key={type}
+                    variant={selectedDataType === type ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedDataType(type)}
+                    className="text-xs"
+                  >
+                    {type}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-            {generateDataBtnDisabled && (
-              <>
-                {/* Export Options */}
-                <div className="space-y-2 pt-2 border-t">
-                  <h4 className="font-medium text-sm">Export Options:</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      onClick={generateDataAsPDF}
-                      variant="outline"
-                      size="sm"
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      PDF
-                    </Button>
-                    <Button
-                      onClick={generateDataAsCSV}
-                      variant="outline"
-                      size="sm"
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Table className="h-4 w-4 mr-2" />}
-                      CSV
-                    </Button>
-                    <Button
-                      onClick={generateDataAsJSON}
-                      variant="outline"
-                      size="sm"
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
-                      JSON
-                    </Button>
-                  </div>
-                </div>
-                {syntheticData.length > 0 && (
+            {/* Export Format Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Export Format</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={selectedExportFormat === 'pdf' ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedExportFormat('pdf')}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button
+                  variant={selectedExportFormat === 'csv' ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedExportFormat('csv')}
+                >
+                  <Table className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+                <Button
+                  variant={selectedExportFormat === 'json' ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedExportFormat('json')}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  JSON
+                </Button>
+              </div>
+            </div>
+
+            {/* Generate Data Button */}
+            <div className="space-y-2 pt-2">
+              <Button
+                onClick={generateDataFile}
+                className="w-full"
+                disabled={!selectedDataType || !selectedExportFormat || isGenerating}
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  'Generate Data'
+                )}
+              </Button>
+              {(!selectedDataType || !selectedExportFormat) && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Select a data type and export format to continue.
+                </p>
+              )}
+            </div>
+            
+            {syntheticData.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">
                       Generated Data Preview:
@@ -527,8 +563,6 @@ const Dashboard = () => {
                     </div>
                   </div>
                 )}
-              </>
-            )}
           </CardContent>
         </Card>
 
