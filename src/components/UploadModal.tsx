@@ -68,9 +68,6 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
     switch (datastore) {
       case 'aws-s3':
         return [
-          { key: 'AWS_ACCESS_KEY_ID', label: 'AWS Access Key ID', placeholder: 'Enter your AWS Access Key ID' },
-          { key: 'AWS_SECRET_ACCESS_KEY', label: 'AWS Secret Access Key', placeholder: 'Enter your AWS Secret Access Key' },
-          { key: 'AWS_REGION', label: 'AWS Region', placeholder: 'e.g., us-east-1' },
           { key: 'AWS_BUCKET_NAME', label: 'AWS Bucket Name', placeholder: 'Enter your S3 bucket name' },
         ];
       case 'aws-rds':

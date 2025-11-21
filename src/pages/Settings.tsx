@@ -18,7 +18,6 @@ const Settings = () => {
     accessKey: "",
     secretKey: "",
     region: "us-east-1",
-    bucketName: ""
   });
 
   const [azureCredentials, setAzureCredentials] = useState({
@@ -72,7 +71,6 @@ const Settings = () => {
           access_key_id: awsCredentials.accessKey,
           secret_access_key: awsCredentials.secretKey,
           region: awsCredentials.region,
-          bucket_name: awsCredentials.bucketName,
         }),
       });
 
@@ -273,17 +271,6 @@ const Settings = () => {
                           value={awsCredentials.region}
                           onChange={(e) => setAwsCredentials(prev => ({ ...prev, region: e.target.value }))}
                           placeholder="e.g., ap-south-1"
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="bucketName">Bucket Name</Label>
-                        <Input
-                          id="bucketName"
-                          value={awsCredentials.bucketName}
-                          onChange={(e) => setAwsCredentials(prev => ({ ...prev, bucketName: e.target.value }))}
-                          placeholder="my-app-bucket"
                           required
                         />
                       </div>
