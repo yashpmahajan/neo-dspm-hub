@@ -2,6 +2,7 @@
 from http.client import HTTPException
 import os
 import boto3
+from typing import Optional, Tuple
 
 SAVE_DIR = os.path.join("app", "generated_files")
 
@@ -139,3 +140,46 @@ def get_rds_endpoint_from_aws(db_identifier: str,
         raise HTTPException(status_code=500, detail=f"Error discovering RDS endpoint: {e}")
 
     raise HTTPException(status_code=404, detail=f"Could not discover endpoint for identifier: {db_identifier}")
+
+
+def discover_azure_sql_host(subscription_id: str,
+                            resource_group: str,
+                            server_name: str,
+                            tenant_id: Optional[str] = None,
+                            client_id: Optional[str] = None,
+                            client_secret: Optional[str] = None) -> Tuple[str, int]:
+    """
+    Discover Azure SQL server FQDN and port (1433).
+    Uses ClientSecretCredential if tenant_id+client_id+client_secret provided,
+    otherwise falls back to DefaultAzureCredential.
+    Raises HTTPException on failure.
+    """
+    try:
+        print("discover_azure_sql_host")
+        print("DEBUG AUTH:",
+              "tenant_id=", tenant_id,
+              "client_id=", client_id,
+              "client_secret_len=", len(client_secret) if client_secret else None)
+
+        if tenant_id and client_id and client_secret:
+            from azure.identity import ClientSecretCredential
+            credential = ClientSecretCredential(tenant_id=tenant_id, client_id=client_id, client_secret=client_secret)
+        else:
+            from azure.identity import DefaultAzureCredential
+            credential = DefaultAzureCredential()
+        from azure.mgmt.sql import SqlManagementClient
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Azure SDK packages required (azure-identity, azure-mgmt-sql): {e}")
+
+    try:
+        client = SqlManagementClient(credential=credential, subscription_id=subscription_id)
+        srv = client.servers.get(resource_group_name=resource_group, server_name=server_name)
+        # preferred property name
+        fqdn = getattr(srv, "fully_qualified_domain_name", None) or getattr(srv, "fullyQualifiedDomainName", None)
+        if not fqdn:
+            # fallback guess
+            fqdn = f"{server_name}.database.windows.net"
+        return fqdn, 1433
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to discover Azure SQL host: {e}")
+
