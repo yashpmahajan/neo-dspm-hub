@@ -57,7 +57,7 @@ const Dashboard = () => {
     clientResultCurl: ''
   });
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isGenerateExpanded, setIsGenerateExpanded] = useState(true);
+  const [isGenerateExpanded, setIsGenerateExpanded] = useState(false);
   const { toast } = useToast();
 
   // LocalStorage keys for persistence
