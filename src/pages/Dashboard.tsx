@@ -16,6 +16,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { 
   Database, 
   Upload, 
@@ -27,7 +32,8 @@ import {
   Table,
   Code,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  ChevronDown
 } from "lucide-react";
 import { UploadModal } from "@/components/UploadModal";
 
@@ -51,6 +57,7 @@ const Dashboard = () => {
     clientResultCurl: ''
   });
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isGenerateExpanded, setIsGenerateExpanded] = useState(true);
   const { toast } = useToast();
 
   // LocalStorage keys for persistence
@@ -449,97 +456,113 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl">
         {/* Generate Synthetic Data */}
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-6 w-6 text-primary" />
-              Generate Data
-            </CardTitle>
-            <CardDescription>
-              <div>
-                Generate realistic data via LLM.
-              </div>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Data Type Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Data Type</Label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  'PII Data',
-                  'Financial / Credit Card Data',
-                  'Employee / HR Data',
-                  'Healthcare / Medical Records',
-                  'Government Data',
-                  'Insurance Data'
-                ].map((type) => (
+        <Collapsible
+          open={isGenerateExpanded}
+          onOpenChange={setIsGenerateExpanded}
+          className="h-fit"
+        >
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-6 w-6 text-primary" />
+                      Generate Data
+                    </CardTitle>
+                    <CardDescription className="mt-1.5">
+                      Generate realistic data via LLM.
+                    </CardDescription>
+                  </div>
+                  <ChevronDown
+                    className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+                      isGenerateExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4 pt-0">
+                {/* Data Type Selection */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Data Type</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      'PII Data',
+                      'Financial / Credit Card Data',
+                      'Employee / HR Data',
+                      'Healthcare / Medical Records',
+                      'Government Data',
+                      'Insurance Data',
+                      'Business Document'
+                    ].map((type) => (
+                      <Button
+                        key={type}
+                        variant={selectedDataType === type ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedDataType(type)}
+                        className="text-xs h-auto py-2 px-3"
+                      >
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Export Format Selection */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Export Format</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={selectedExportFormat === 'pdf' ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedExportFormat('pdf')}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant={selectedExportFormat === 'csv' ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedExportFormat('csv')}
+                    >
+                      <Table className="h-4 w-4 mr-2" />
+                      CSV
+                    </Button>
+                    <Button
+                      variant={selectedExportFormat === 'json' ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedExportFormat('json')}
+                    >
+                      <Code className="h-4 w-4 mr-2" />
+                      JSON
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Generate Data Button */}
+                <div className="space-y-2 pt-2">
                   <Button
-                    key={type}
-                    variant={selectedDataType === type ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedDataType(type)}
-                    className="text-xs"
+                    onClick={generateDataFile}
+                    className="w-full"
+                    disabled={!selectedDataType || !selectedExportFormat || isGenerating}
                   >
-                    {type}
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Data'
+                    )}
                   </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Export Format Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Export Format</Label>
-              <div className="flex gap-2">
-                <Button
-                  variant={selectedExportFormat === 'pdf' ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedExportFormat('pdf')}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-                <Button
-                  variant={selectedExportFormat === 'csv' ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedExportFormat('csv')}
-                >
-                  <Table className="h-4 w-4 mr-2" />
-                  CSV
-                </Button>
-                <Button
-                  variant={selectedExportFormat === 'json' ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedExportFormat('json')}
-                >
-                  <Code className="h-4 w-4 mr-2" />
-                  JSON
-                </Button>
-              </div>
-            </div>
-
-            {/* Generate Data Button */}
-            <div className="space-y-2 pt-2">
-              <Button
-                onClick={generateDataFile}
-                className="w-full"
-                disabled={!selectedDataType || !selectedExportFormat || isGenerating}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  'Generate Data'
-                )}
-              </Button>
-              {(!selectedDataType || !selectedExportFormat) && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Select a data type and export format to continue.
-                </p>
-              )}
-            </div>
+                  {(!selectedDataType || !selectedExportFormat) && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Select a data type and export format to continue.
+                    </p>
+                  )}
+                </div>
             
             {syntheticData.length > 0 && (
                   <div className="space-y-2">
@@ -563,8 +586,10 @@ const Dashboard = () => {
                     </div>
                   </div>
                 )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Upload to S3 */}
         <Card className="h-fit">
