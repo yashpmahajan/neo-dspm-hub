@@ -47,8 +47,29 @@ def upload_env_bucket():
             dbh.s3_clear_bucket(s3, AWS_BUCKET_NAME)
             log_success(logger, "Bucket cleared successfully", bucket_name=AWS_BUCKET_NAME)
         except Exception as e:
-            log_error(logger, e, f"Failed to clear bucket: {AWS_BUCKET_NAME}")
-            raise HTTPException(status_code=500, detail=f"Failed to clear bucket: {e}")
+            # If botocore is available and this is a ClientError AccessDenied,
+            # make clearing non-fatal and continue to upload (will overwrite the key).
+            try:
+                from botocore.exceptions import ClientError
+            except Exception:
+                ClientError = None
+
+            if ClientError and isinstance(e, ClientError):
+                # Try to get the AWS error code
+                try:
+                    err_code = e.response.get("Error", {}).get("Code")
+                except Exception:
+                    err_code = None
+
+                if err_code in ("AccessDenied", "AccessDeniedException", "UnauthorizedOperation", "403"):
+                    log_warning(logger, f"Access denied when clearing bucket {AWS_BUCKET_NAME}; skipping clear and continuing", error=str(e))
+                else:
+                    log_error(logger, e, f"Failed to clear bucket: {AWS_BUCKET_NAME}")
+                    raise HTTPException(status_code=500, detail=f"Failed to clear bucket: {e}")
+            else:
+                # If it's not a botocore ClientError, re-raise as before
+                log_error(logger, e, f"Failed to clear bucket: {AWS_BUCKET_NAME}")
+                raise HTTPException(status_code=500, detail=f"Failed to clear bucket: {e}")
 
         s3_key = f"data.{filetype}"
         log_step(logger, "Uploading file to S3", bucket=AWS_BUCKET_NAME, s3_key=s3_key, filename=filename)

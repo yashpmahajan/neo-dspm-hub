@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, MouseEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 import { Cloud, Database } from "lucide-react";
 
 type CloudVendor = 'aws' | 'azure' | 'gcp' | null;
@@ -26,6 +27,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
   const [cloudVendor, setCloudVendor] = useState<CloudVendor>(null);
   const [selectedDatastore, setSelectedDatastore] = useState<DatastoreType>(null);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
   const handleVendorSelect = (vendor: CloudVendor) => {
     setCloudVendor(vendor);
@@ -51,10 +53,52 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleUpload = () => {
-    if (selectedDatastore) {
-      onUpload(selectedDatastore, credentials);
+  const handleUpload = async (event?: MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+
+    if (!selectedDatastore || isUploading) {
+      return;
     }
+
+    // Special handling for AWS S3 bucket name - persist before upload
+    if (selectedDatastore === "aws-s3") {
+      const bucketName = credentials["AWS_BUCKET_NAME"]?.trim();
+      if (!bucketName) {
+        toast({
+          title: "Bucket name required",
+          description: "Please enter a valid AWS S3 bucket name before uploading.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_API}/store-s3-bucketname`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bucket_name: bucketName }),
+        });
+
+        if (!response.ok) {
+          const errorMessage = await response.text().catch(() => "");
+          throw new Error(errorMessage || "Failed to store AWS bucket name");
+        }
+
+        toast({
+          title: "Bucket name saved",
+          description: "AWS S3 bucket name stored successfully.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error saving bucket name",
+          description: error instanceof Error ? error.message : "Failed to store AWS bucket name. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    await onUpload(selectedDatastore, credentials);
   };
 
   const handleCancel = () => {
@@ -159,6 +203,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
         {!cloudVendor ? (
           <div className="grid grid-cols-1 gap-4 py-4">
             <Button
+              type="button"
               variant="outline"
               className="h-24 flex flex-col gap-2 hover:border-primary hover:bg-primary/5"
               onClick={() => handleVendorSelect('aws')}
@@ -168,6 +213,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
             </Button>
             
             <Button
+              type="button"
               variant="outline"
               className="h-24 flex flex-col gap-2 hover:border-primary hover:bg-primary/5"
               onClick={() => handleVendorSelect('azure')}
@@ -177,6 +223,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
             </Button>
             
             <Button
+              type="button"
               variant="outline"
               className="h-24 flex flex-col gap-2 hover:border-primary hover:bg-primary/5"
               onClick={() => handleVendorSelect('gcp')}
@@ -191,6 +238,7 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
               const Icon = datastore.icon;
               return (
                 <Button
+                  type="button"
                   key={datastore.id}
                   variant="outline"
                   className="h-24 flex flex-col gap-2 hover:border-primary hover:bg-primary/5"
@@ -222,21 +270,35 @@ export const UploadModal = ({ open, onOpenChange, onUpload, isUploading }: Uploa
         <DialogFooter>
           {selectedDatastore ? (
             <>
-              <Button variant="outline" onClick={handleBackToDatastore} disabled={isUploading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackToDatastore}
+                disabled={isUploading}
+              >
                 Back
               </Button>
-              <Button onClick={handleUpload} disabled={!isFormValid() || isUploading}>
+              <Button
+                type="button"
+                onClick={handleUpload}
+                disabled={!isFormValid() || isUploading}
+              >
                 {isUploading ? 'Uploading...' : 'Save & Upload'}
               </Button>
             </>
           ) : cloudVendor ? (
             <>
-              <Button variant="outline" onClick={handleBackToVendor} disabled={isUploading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackToVendor}
+                disabled={isUploading}
+              >
                 Back
               </Button>
             </>
           ) : (
-            <Button variant="outline" onClick={handleCancel}>
+            <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
           )}
