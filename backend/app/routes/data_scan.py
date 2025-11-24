@@ -7,7 +7,8 @@ import asyncio
 import re
 import json
 import subprocess
-from app.logging_config import get_logger
+from app.utils.logging_config import get_logger
+from app.utils.logger_helper import log_api_request, log_api_response, log_error, log_step, log_success, log_warning
 import time
 import os
 import shutil
@@ -372,195 +373,236 @@ async def data_scan(request: DataScanRequest, current_user: dict = Depends(get_c
     Execute 3 curl commands in order and return responses
     1st: Generate token, 2nd: Use token, 3rd: Use token (with 15min wait)
     """
-    if len(request.curl_commands) != 3:
-        raise HTTPException(status_code=400, detail="Exactly 3 curl commands are required")
+    log_api_request(logger, "POST", "/data-scan", username=current_user.get("username"), curl_commands_count=len(request.curl_commands))
     
-    # Start fresh: delete specific artifact files (not entire folder)
-    clean_artifact_files()
-    
-    extracted_token = ""
-    curl_executor = CurlExecutor()
-    artifacts_created = False
-    validation_report_created = False
-    validation_json_created = False
-
-    # Get user id for report naming
-    user = users_collection.find_one({"username": current_user["username"]}) if current_user and "username" in current_user else None
-    user_id = str(user["_id"]) if user and "_id" in user else "unknown"
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    
-    # Execute 1st curl command to get token
     try:
-        logger.info("🚀 Executing 1st curl command to generate token...")
-        first_body, first_status = curl_executor.run_curl_with_status(request.curl_commands[0], retry=1)
-        logger.info(f"📝 1st curl HTTP status: {first_status}")
-        logger.info(f"📦 1st curl body (truncated): {first_body[:1000]}")
+        if len(request.curl_commands) != 3:
+            log_error(logger, ValueError("Invalid number of curl commands"), f"Expected 3, got {len(request.curl_commands)}")
+            raise HTTPException(status_code=400, detail="Exactly 3 curl commands are required")
         
-        # Extract token: prefer direct JSON parse; fallback to GPT
-        extracted_token = None
-        try:
-            parsed = _best_effort_json_parse(first_body)
-            if parsed is not None:
-                candidate = _find_token_in_json(parsed)
-                if candidate:
-                    extracted_token = candidate
-                    logger.info("🔑 Token extracted via JSON parsing.")
-        except Exception as e:
-            logger.warning(f"⚠️ Direct JSON token parse failed: {e}")
-        if not extracted_token:
-            extracted_token = await curl_executor.extract_token_from_gpt(first_body)
-            logger.info("🧠 Token extracted via GPT.")
-        # Sanitize/validate token
-        extracted_token = curl_executor.sanitize_and_validate_token(extracted_token)
-        logger.info(f"✅ Token extracted successfully (length {len(extracted_token)}). Using for auth...")
+        # Start fresh: delete specific artifact files (not entire folder)
+        log_step(logger, "Cleaning artifact files before scan")
+        clean_artifact_files()
         
-    except Exception as e:
-        logger.error(f"❌ Failed to execute 1st curl or extract token: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
-    
-    # Execute 2nd curl command with token
-    try:
-        logger.info(f"🚀 Executing 2nd curl command with authorization token... {extracted_token}")
-        curl_with_auth = curl_executor.add_authorization_header(request.curl_commands[1], extracted_token)
-        second_body, second_status = curl_executor.run_curl_with_status(curl_with_auth, retry=1)
-        logger.info(f"📝 2nd curl HTTP status: {second_status}")
-        logger.info(f"📦 2nd curl body (truncated): {second_body[:1000]}")
-        
-        # Treat non-2xx as failure for scan step
-        if second_status is None or not (200 <= second_status < 300):
-            raise HTTPException(status_code=500, detail="scan failed")
-        
-    except HTTPException:
-        # Re-raise our explicit scan failed
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to execute 2nd curl: {str(e)}")
-        raise HTTPException(status_code=500, detail="scan failed")
-    
-    # Wait for 15 minutes before executing 3rd curl
-    logger.info("⏰ Waiting 15 minutes before executing 3rd curl command...")
-    await asyncio.sleep(900)  # 15 minutes = 900 seconds
-    
-    # Execute 3rd curl command with token
-    try:
-        logger.info("🚀 Executing 3rd curl command with authorization token...")
-        base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
-
-        max_attempts = 3
-        wait_seconds = 2
-        output = ""
-        status = None
-
-        for attempt in range(1, max_attempts + 1):
-            logger.info(f"▶️ 3rd curl attempt {attempt}/{max_attempts}")
-            output, status = curl_executor.run_curl_with_status(base_curl, retry=1)
-            logger.info(f"📝 3rd curl HTTP status: {status}")
-            logger.info(f"📦 3rd curl body (truncated): {output[:1000]}")
-
-            if status != 401:
-                break
-
-            # On 401, refresh token by re-running 1st curl + extraction
-            logger.warning("🔁 401 Unauthorized on 3rd curl, refreshing token and retrying...")
-            try:
-                first_output, first_status_retry = curl_executor.run_curl_with_status(request.curl_commands[0], retry=1)
-                logger.info(f"📝 Reauth 1st curl HTTP status: {first_status_retry}")
-                logger.info(f"📦 Reauth 1st curl body (truncated): {first_output[:1000]}")
-                new_token = await curl_executor.extract_token_from_gpt(first_output)
-                extracted_token = new_token
-                base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
-                logger.info("✅ Token refreshed. Retrying 3rd curl...")
-            except Exception as e:
-                logger.error(f"❌ Failed to refresh token: {e}")
-                break
-
-            if attempt < max_attempts:
-                time.sleep(wait_seconds)
-                wait_seconds *= 2
-
-        # Extract and store scanResults regardless of status (if body is present)
-        logger.info("🔍 Processing 3rd curl response for scanResults...")
-        artifacts_created = extract_and_store_scan_results(output)
-
-        # Generate validation report (JSON and PDF) using OpenAI
+        extracted_token = ""
+        curl_executor = CurlExecutor()
+        artifacts_created = False
         validation_report_created = False
         validation_json_created = False
-        try:
-            artifacts_dir = create_artifacts_folder()
-            client_result_path = os.path.join(artifacts_dir, "client_result.json")
-            ground_truth_path = os.path.join(artifacts_dir, "data.json")
-            pdf_filename = f"dspm_validation_report_{user_id}_{timestamp}.pdf"
-            pdf_output_path = os.path.join(artifacts_dir, pdf_filename)
-            json_filename = f"dspm_validation_report_{user_id}_{timestamp}.json"
-            json_output_path = os.path.join(artifacts_dir, json_filename)
 
-            validator = DSPMValidator()
-            logger.info("🧠 Generating validation using OpenAI...")
-            validation_json = validator.validate_client_results(
-                client_result_path=client_result_path,
-                ground_truth_path=ground_truth_path,
-                pdf_output_path=pdf_output_path
-            )
-
-            if validation_json:
-                with open(json_output_path, "w", encoding="utf-8") as f:
-                    json.dump(validation_json, f, indent=2, ensure_ascii=False)
-                validation_json_created = True
-                logger.info(f"💾 Saved validation JSON: {json_output_path}")
-
-            if os.path.exists(pdf_output_path):
-                validation_report_created = True
-                logger.info(f"📄 Saved validation PDF: {pdf_output_path}")
-        except Exception as e:
-            logger.error(f"❌ Failed to generate validation report: {e}")
-
-        return DataScanResponse(
-            response_body=output,
-            execution_success=(status is None or (200 <= status < 300)),
-            artifacts_created=artifacts_created,
-            validation_report_created=validation_report_created,
-            validation_json_created=validation_json_created
-        )
+        # Get user id for report naming
+        user = users_collection.find_one({"username": current_user["username"]}) if current_user and "username" in current_user else None
+        user_id = str(user["_id"]) if user and "_id" in user else "unknown"
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         
+        # Execute 1st curl command to get token
+        try:
+            log_step(logger, "Executing 1st curl command to generate token")
+            first_body, first_status = curl_executor.run_curl_with_status(request.curl_commands[0], retry=1)
+            log_step(logger, "1st curl command completed", http_status=first_status, body_length=len(first_body))
+            
+            # Extract token: prefer direct JSON parse; fallback to GPT
+            log_step(logger, "Extracting token from response")
+            extracted_token = None
+            try:
+                parsed = _best_effort_json_parse(first_body)
+                if parsed is not None:
+                    candidate = _find_token_in_json(parsed)
+                    if candidate:
+                        extracted_token = candidate
+                        log_success(logger, "Token extracted via JSON parsing")
+            except Exception as e:
+                log_warning(logger, f"Direct JSON token parse failed: {e}", falling_back="GPT extraction")
+            if not extracted_token:
+                extracted_token = await curl_executor.extract_token_from_gpt(first_body)
+                log_success(logger, "Token extracted via GPT")
+            # Sanitize/validate token
+            extracted_token = curl_executor.sanitize_and_validate_token(extracted_token)
+            log_success(logger, "Token extracted and validated", token_length=len(extracted_token))
+            
+        except Exception as e:
+            log_error(logger, e, "Failed to execute 1st curl or extract token")
+            raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
+    
+        # Execute 2nd curl command with token
+        try:
+            log_step(logger, "Executing 2nd curl command with authorization token")
+            curl_with_auth = curl_executor.add_authorization_header(request.curl_commands[1], extracted_token)
+            second_body, second_status = curl_executor.run_curl_with_status(curl_with_auth, retry=1)
+            log_step(logger, "2nd curl command completed", http_status=second_status, body_length=len(second_body))
+            
+            # Treat non-2xx as failure for scan step
+            if second_status is None or not (200 <= second_status < 300):
+                log_error(logger, ValueError("Scan failed"), f"HTTP status: {second_status}")
+                raise HTTPException(status_code=500, detail="scan failed")
+            log_success(logger, "2nd curl command succeeded", http_status=second_status)
+            
+        except HTTPException:
+            # Re-raise our explicit scan failed
+            raise
+        except Exception as e:
+            log_error(logger, e, "Failed to execute 2nd curl")
+            raise HTTPException(status_code=500, detail="scan failed")
+    
+        # Wait for 15 minutes before executing 3rd curl
+        log_step(logger, "Waiting 15 minutes before executing 3rd curl command")
+        await asyncio.sleep(900)  # 15 minutes = 900 seconds
+        log_success(logger, "Wait period completed, proceeding with 3rd curl")
+        
+        # Execute 3rd curl command with token
+        try:
+            log_step(logger, "Executing 3rd curl command with authorization token")
+            base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
+
+            max_attempts = 3
+            wait_seconds = 2
+            output = ""
+            status = None
+
+            for attempt in range(1, max_attempts + 1):
+                log_step(logger, f"3rd curl attempt {attempt}/{max_attempts}")
+                output, status = curl_executor.run_curl_with_status(base_curl, retry=1)
+                log_step(logger, "3rd curl command completed", http_status=status, body_length=len(output))
+
+                if status != 401:
+                    log_success(logger, "3rd curl command succeeded", http_status=status)
+                    break
+
+                # On 401, refresh token by re-running 1st curl + extraction
+                log_warning(logger, "401 Unauthorized on 3rd curl, refreshing token and retrying", attempt=attempt)
+                try:
+                    log_step(logger, "Refreshing token by re-executing 1st curl")
+                    first_output, first_status_retry = curl_executor.run_curl_with_status(request.curl_commands[0], retry=1)
+                    log_step(logger, "Reauth 1st curl completed", http_status=first_status_retry)
+                    new_token = await curl_executor.extract_token_from_gpt(first_output)
+                    extracted_token = new_token
+                    base_curl = curl_executor.add_authorization_header(request.curl_commands[2], extracted_token)
+                    log_success(logger, "Token refreshed, retrying 3rd curl")
+                except Exception as e:
+                    log_error(logger, e, "Failed to refresh token")
+                    break
+
+                if attempt < max_attempts:
+                    time.sleep(wait_seconds)
+                    wait_seconds *= 2
+
+            # Extract and store scanResults regardless of status (if body is present)
+            log_step(logger, "Processing 3rd curl response for scanResults")
+            artifacts_created = extract_and_store_scan_results(output)
+            if artifacts_created:
+                log_success(logger, "Scan results extracted and stored")
+            else:
+                log_warning(logger, "Failed to extract scan results")
+
+            # Generate validation report (JSON and PDF) using OpenAI
+            validation_report_created = False
+            validation_json_created = False
+            try:
+                log_step(logger, "Generating validation report using OpenAI")
+                artifacts_dir = create_artifacts_folder()
+                client_result_path = os.path.join(artifacts_dir, "client_result.json")
+                ground_truth_path = os.path.join(artifacts_dir, "data.json")
+                pdf_filename = f"dspm_validation_report_{user_id}_{timestamp}.pdf"
+                pdf_output_path = os.path.join(artifacts_dir, pdf_filename)
+                json_filename = f"dspm_validation_report_{user_id}_{timestamp}.json"
+                json_output_path = os.path.join(artifacts_dir, json_filename)
+
+                validator = DSPMValidator()
+                validation_json = validator.validate_client_results(
+                    client_result_path=client_result_path,
+                    ground_truth_path=ground_truth_path,
+                    pdf_output_path=pdf_output_path
+                )
+
+                if validation_json:
+                    with open(json_output_path, "w", encoding="utf-8") as f:
+                        json.dump(validation_json, f, indent=2, ensure_ascii=False)
+                    validation_json_created = True
+                    log_success(logger, "Validation JSON saved", path=json_output_path)
+
+                if os.path.exists(pdf_output_path):
+                    validation_report_created = True
+                    log_success(logger, "Validation PDF saved", path=pdf_output_path)
+            except Exception as e:
+                log_error(logger, e, "Failed to generate validation report")
+
+            log_api_response(logger, "POST", "/data-scan", status_code=200, execution_success=(status is None or (200 <= status < 300)), artifacts_created=artifacts_created)
+            return DataScanResponse(
+                response_body=output,
+                execution_success=(status is None or (200 <= status < 300)),
+                artifacts_created=artifacts_created,
+                validation_report_created=validation_report_created,
+                validation_json_created=validation_json_created
+            )
+            
+        except Exception as e:
+            log_error(logger, e, "Failed to execute 3rd curl")
+            return DataScanResponse(
+                response_body="",
+                execution_success=False,
+                error=str(e),
+                artifacts_created=False,
+                validation_report_created=False,
+                validation_json_created=False
+            )
+    
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Failed to execute 3rd curl: {str(e)}")
-        return DataScanResponse(
-            response_body="",
-            execution_success=False,
-            error=str(e),
-            artifacts_created=False,
-            validation_report_created=False,
-            validation_json_created=False
-        )
+        log_error(logger, e, "During data scan execution")
+        raise HTTPException(status_code=500, detail=f"Data scan failed: {str(e)}")
 
 @router.get("/download/report")
 def download_report():
-    artifacts_dir = create_artifacts_folder()
-    # Find latest dspm_validation_report_*.pdf
-    candidates = [
-        os.path.join(artifacts_dir, f) for f in os.listdir(artifacts_dir)
-        if f.startswith("dspm_validation_report_") and f.endswith(".pdf")
-    ]
-    if not candidates:
-        raise HTTPException(status_code=404, detail="Report PDF not found. Run /data-scan first.")
-    latest = max(candidates, key=lambda p: os.path.getmtime(p))
-    logger.info(f"⬇️ Sending report PDF: {latest}")
-    return FileResponse(latest, media_type="application/pdf", filename=os.path.basename(latest))
+    log_api_request(logger, "GET", "/download/report")
+    
+    try:
+        log_step(logger, "Finding latest validation report PDF")
+        artifacts_dir = create_artifacts_folder()
+        # Find latest dspm_validation_report_*.pdf
+        candidates = [
+            os.path.join(artifacts_dir, f) for f in os.listdir(artifacts_dir)
+            if f.startswith("dspm_validation_report_") and f.endswith(".pdf")
+        ]
+        if not candidates:
+            log_error(logger, FileNotFoundError("Report PDF not found"), "Report file search")
+            raise HTTPException(status_code=404, detail="Report PDF not found. Run /data-scan first.")
+        latest = max(candidates, key=lambda p: os.path.getmtime(p))
+        log_success(logger, "Latest report PDF found", path=latest)
+        log_api_response(logger, "GET", "/download/report", status_code=200, filename=os.path.basename(latest))
+        return FileResponse(latest, media_type="application/pdf", filename=os.path.basename(latest))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(logger, e, "During report download")
+        raise HTTPException(status_code=500, detail=f"Failed to download report: {str(e)}")
 
 @router.get("/download/artifacts-zip")
 def download_artifacts_zip():
-    artifacts_dir = create_artifacts_folder()
-    # Create zip archive inside artifacts directory
-    base_name = os.path.join(artifacts_dir, "artifacts_export")
-    zip_path = f"{base_name}.zip"
-    # Remove any old zip
+    log_api_request(logger, "GET", "/download/artifacts-zip")
+    
     try:
-        if os.path.exists(zip_path):
-            os.remove(zip_path)
+        log_step(logger, "Creating artifacts zip archive")
+        artifacts_dir = create_artifacts_folder()
+        # Create zip archive inside artifacts directory
+        base_name = os.path.join(artifacts_dir, "artifacts_export")
+        zip_path = f"{base_name}.zip"
+        # Remove any old zip
+        try:
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+                log_step(logger, "Removed old zip archive")
+        except Exception as e:
+            log_warning(logger, f"Could not remove old zip: {e}", continuing="zip creation")
+        # Build zip
+        log_step(logger, "Building zip archive", root_dir=artifacts_dir)
+        shutil.make_archive(base_name=base_name, format="zip", root_dir=artifacts_dir)
+        log_success(logger, "Artifacts zip created", path=zip_path)
+        log_api_response(logger, "GET", "/download/artifacts-zip", status_code=200)
+        return FileResponse(zip_path, media_type="application/zip", filename="artifacts.zip")
+    
     except Exception as e:
-        logger.warning(f"Could not remove old zip: {e}")
-    # Build zip
-    shutil.make_archive(base_name=base_name, format="zip", root_dir=artifacts_dir)
-    logger.info(f"⬇️ Sending artifacts zip: {zip_path}")
-    return FileResponse(zip_path, media_type="application/zip", filename="artifacts.zip")
+        log_error(logger, e, "During artifacts zip download")
+        raise HTTPException(status_code=500, detail=f"Failed to create artifacts zip: {str(e)}")
     

@@ -62,3 +62,4 @@ def setup_route_logging():
     logging.getLogger("app").setLevel(logging.INFO)
     
     logging.info("🔧 Route logging system configured - all route logs will be visible in console")
+

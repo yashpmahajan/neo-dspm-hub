@@ -6,6 +6,9 @@ from app.routes.user import get_current_user
 import boto3
 from app.db.mongodb import users_collection
 from datetime import datetime
+from app.utils.logger_helper import get_logger, log_api_request, log_api_response, log_error, log_step, log_success, log_warning
+
+logger = get_logger("generatedata")
 
 router = APIRouter()
 
@@ -44,6 +47,7 @@ def clean_ollama_output(text: str) -> str:
 
 def process_with_ollama_for_credit_cards():
     try:
+        log_step(logger, "Starting Ollama AI model execution for data generation")
         completed = subprocess.run(
             ["ollama", "run", "tarique_salat/dspm-ai-model:latest", CARD_PROMPT],
             capture_output=True,
@@ -52,23 +56,28 @@ def process_with_ollama_for_credit_cards():
             timeout=600
         )
         raw_output = completed.stdout.strip()
-        print("Raw Ollama output:", raw_output)  # debug
+        log_step(logger, "Ollama model execution completed", output_length=len(raw_output))
 
         cleaned = clean_ollama_output(raw_output)
+        log_step(logger, "Cleaned Ollama output", cleaned_length=len(cleaned))
 
         try:
             data = json.loads(cleaned)
             if isinstance(data, dict):
+                log_success(logger, "Parsed JSON data as dictionary", records=1)
                 return [data]
             elif isinstance(data, list):
+                log_success(logger, "Parsed JSON data as list", records=len(data))
                 return data
         except Exception as e:
-            print("JSON parsing error:", e)
+            log_warning(logger, f"JSON parsing error: {e}", falling_back="entity/value structure")
 
         # Fallback: wrap cleaned raw text in entity/value structure
+        log_step(logger, "Using fallback entity/value structure")
         return [{"entity": "AI_OUTPUT", "value": cleaned}]
 
     except Exception as e:
+        log_error(logger, e, "During Ollama AI model execution")
         return [{"entity": "AI_ERROR", "value": str(e)}]
 
 @router.get("/generatedata")
@@ -76,188 +85,266 @@ def generate_data(
     filetype: str = Query(..., enum=["json", "pdf", "csv"]),
     # current_user: dict = Depends(get_current_user)
 ):
-    # Clear existing files in SAVE_DIR
-    for f in os.listdir(SAVE_DIR):
-        file_path = os.path.join(SAVE_DIR, f)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
+    log_api_request(logger, "GET", "/generatedata", filetype=filetype)
+    
+    try:
+        log_step(logger, "Clearing existing files in SAVE_DIR", save_dir=SAVE_DIR)
+        # Clear existing files in SAVE_DIR
+        cleared_count = 0
+        for f in os.listdir(SAVE_DIR):
+            file_path = os.path.join(SAVE_DIR, f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                cleared_count += 1
+        if cleared_count > 0:
+            log_step(logger, f"Cleared {cleared_count} existing file(s) from SAVE_DIR")
 
-    # Cleanup previous artifacts/data.json if present
-    artifact_json_path = os.path.join(ARTIFACTS_DIR, "data.json")
-    if os.path.exists(artifact_json_path):
-        os.remove(artifact_json_path)
+        # Cleanup previous artifacts/data.json if present
+        artifact_json_path = os.path.join(ARTIFACTS_DIR, "data.json")
+        if os.path.exists(artifact_json_path):
+            os.remove(artifact_json_path)
+            log_step(logger, "Removed previous artifacts/data.json")
 
-    # ----- INTEGRATE OLLAMA MODEL -----
-    processed_data = process_with_ollama_for_credit_cards()
+        # ----- INTEGRATE OLLAMA MODEL -----
+        log_step(logger, "Processing data with Ollama AI model")
+        processed_data = process_with_ollama_for_credit_cards()
 
-    # Normalize always to list of dicts
-    if isinstance(processed_data, dict):
-        processed_data = [processed_data]
+        # Normalize always to list of dicts
+        if isinstance(processed_data, dict):
+            processed_data = [processed_data]
 
-    filename = os.path.join(SAVE_DIR, f"data.{filetype}")
-    media_type = "application/octet-stream"
+        log_step(logger, f"Generating {filetype} file", records=len(processed_data))
+        filename = os.path.join(SAVE_DIR, f"data.{filetype}")
+        media_type = "application/octet-stream"
 
-    if filetype == "json":
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(processed_data, f, indent=2, ensure_ascii=False)
-        media_type = "application/json"
+        if filetype == "json":
+            log_step(logger, "Writing JSON file")
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(processed_data, f, indent=2, ensure_ascii=False)
+            media_type = "application/json"
+            log_success(logger, "JSON file generated", filename=filename, records=len(processed_data))
 
-    elif filetype == "csv":
-        fieldnames = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", "passportNumber", "dateOfBirth", "address"]
-        with open(filename, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in processed_data:
-                address = row.get("address", "")
-                if isinstance(address, dict):
-                    address = ", ".join(f"{k}: {v}" for k, v in address.items())
-                writer.writerow({
-                    "fullName": row.get("fullName", ""),
-                    "email": row.get("email", ""),
-                    "ssnNumber": row.get("ssnNumber", ""),
-                    "drivingLicenseNumber": row.get("drivingLicenseNumber", ""),
-                    "passportNumber": row.get("passportNumber", ""),
-                    "dateOfBirth": row.get("dateOfBirth", ""),
-                    "address": address,
-                })
-        media_type = "text/csv"
+        elif filetype == "csv":
+            log_step(logger, "Writing CSV file")
+            fieldnames = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", "passportNumber", "dateOfBirth", "address"]
+            with open(filename, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in processed_data:
+                    address = row.get("address", "")
+                    if isinstance(address, dict):
+                        address = ", ".join(f"{k}: {v}" for k, v in address.items())
+                    writer.writerow({
+                        "fullName": row.get("fullName", ""),
+                        "email": row.get("email", ""),
+                        "ssnNumber": row.get("ssnNumber", ""),
+                        "drivingLicenseNumber": row.get("drivingLicenseNumber", ""),
+                        "passportNumber": row.get("passportNumber", ""),
+                        "dateOfBirth": row.get("dateOfBirth", ""),
+                        "address": address,
+                    })
+            media_type = "text/csv"
+            log_success(logger, "CSV file generated", filename=filename, records=len(processed_data))
 
-    elif filetype == "pdf":
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        pdf.set_font("Arial", style="B", size=14)
-        pdf.cell(0, 10, txt="Generated Personal Information Test Data", ln=1)
-        pdf.ln(3)
-
-        keys = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", 
-                "passportNumber", "dateOfBirth", "address"]
-        
-        # Dynamically calculate the widest key
-        max_key_width = max(pdf.get_string_width(key + ":") for key in keys) + 5
-
-        for idx, entry in enumerate(processed_data, start=1):
-            pdf.set_font("Arial", style="B", size=12)
-            pdf.cell(0, 8, txt=f"Entry {idx}", ln=1)
-            pdf.set_font("Arial", size=11)
-
-            for key in keys:
-                value = entry.get(key, "")
-                if isinstance(value, dict):
-                    value = ", ".join(f"{k}: {v}" for k, v in value.items())
-
-                # Key column
-                pdf.set_font("Arial", style="B", size=11)
-                pdf.cell(max_key_width, 8, txt=f"{key}:", ln=0)
-
-                # Value column (wrapped if too long)
-                pdf.set_font("Arial", size=11)
-                pdf.multi_cell(0, 8, txt=str(value))
-
+        elif filetype == "pdf":
+            log_step(logger, "Generating PDF file")
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+            pdf.set_font("Arial", style="B", size=14)
+            pdf.cell(0, 10, txt="Generated Personal Information Test Data", ln=1)
             pdf.ln(3)
 
-        pdf.output(filename)
-        media_type = "application/pdf"
+            keys = ["fullName", "email", "ssnNumber", "drivingLicenseNumber", 
+                    "passportNumber", "dateOfBirth", "address"]
+            
+            # Dynamically calculate the widest key
+            max_key_width = max(pdf.get_string_width(key + ":") for key in keys) + 5
 
-    else:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+            for idx, entry in enumerate(processed_data, start=1):
+                pdf.set_font("Arial", style="B", size=12)
+                pdf.cell(0, 8, txt=f"Entry {idx}", ln=1)
+                pdf.set_font("Arial", size=11)
 
-    # Save a JSON copy in artifacts/data.json
-    with open(artifact_json_path, "w", encoding="utf-8") as af:
-        json.dump(processed_data, af, indent=2, ensure_ascii=False)
+                for key in keys:
+                    value = entry.get(key, "")
+                    if isinstance(value, dict):
+                        value = ", ".join(f"{k}: {v}" for k, v in value.items())
 
-    return FileResponse(filename, media_type=media_type, filename=os.path.basename(filename))
+                    # Key column
+                    pdf.set_font("Arial", style="B", size=11)
+                    pdf.cell(max_key_width, 8, txt=f"{key}:", ln=0)
+
+                    # Value column (wrapped if too long)
+                    pdf.set_font("Arial", size=11)
+                    pdf.multi_cell(0, 8, txt=str(value))
+
+                pdf.ln(3)
+
+            pdf.output(filename)
+            media_type = "application/pdf"
+            log_success(logger, "PDF file generated", filename=filename, records=len(processed_data))
+
+        else:
+            log_error(logger, ValueError(f"Invalid file type: {filetype}"), "File type validation")
+            raise HTTPException(status_code=400, detail="Invalid file type")
+
+        # Save a JSON copy in artifacts/data.json
+        log_step(logger, "Saving JSON copy to artifacts/data.json")
+        with open(artifact_json_path, "w", encoding="utf-8") as af:
+            json.dump(processed_data, af, indent=2, ensure_ascii=False)
+        log_success(logger, "JSON copy saved to artifacts", path=artifact_json_path)
+
+        log_api_response(logger, "GET", "/generatedata", status_code=200, filetype=filetype, filename=os.path.basename(filename))
+        return FileResponse(filename, media_type=media_type, filename=os.path.basename(filename))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(logger, e, "During data generation")
+        raise HTTPException(status_code=500, detail=f"Failed to generate data: {str(e)}")
 
 
 @router.post("/uploadtobucket")
 def upload_to_bucket(
     current_user: dict = Depends(get_current_user)
 ):
-    # Auto-detect filetype from available files
-    filetype = None
-    filename = None
-    for ext in ["json", "pdf", "csv"]:
-        test_path = os.path.join(SAVE_DIR, f"data.{ext}")
-        if os.path.exists(test_path):
-            filetype = ext
-            filename = test_path
-            break
-    if not filetype or not filename:
-        raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
-
-    # Get user id from DB
-    user = users_collection.find_one({"username": current_user["username"]})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found in DB.")
-    user_id = str(user["_id"])
-
-    # AWS credentials from ENV
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
-        raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
-
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION
-    )
-
-    # Create bucket name with timestamp
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    bucket_name = f"neo-bucket-{timestamp}"
-
-    # Create bucket
+    log_api_request(logger, "POST", "/uploadtobucket", username=current_user.get("username"))
+    
     try:
-        if AWS_REGION == "us-east-1":
-            s3.create_bucket(Bucket=bucket_name)
-        else:
-            s3.create_bucket(
-                Bucket=bucket_name,
-                CreateBucketConfiguration={"LocationConstraint": AWS_REGION}
-            )
+        log_step(logger, "Auto-detecting filetype from available files")
+        # Auto-detect filetype from available files
+        filetype = None
+        filename = None
+        for ext in ["json", "pdf", "csv"]:
+            test_path = os.path.join(SAVE_DIR, f"data.{ext}")
+            if os.path.exists(test_path):
+                filetype = ext
+                filename = test_path
+                break
+        
+        if not filetype or not filename:
+            log_error(logger, FileNotFoundError("No generated file found"), "File detection")
+            raise HTTPException(status_code=404, detail="No generated file found. Please generate the file first.")
+        
+        log_success(logger, "File detected", filetype=filetype, filename=filename)
+
+        # Get user id from DB
+        log_step(logger, "Fetching user from database", username=current_user.get("username"))
+        user = users_collection.find_one({"username": current_user["username"]})
+        if not user:
+            log_error(logger, ValueError("User not found"), f"User lookup: {current_user.get('username')}")
+            raise HTTPException(status_code=404, detail="User not found in DB.")
+        user_id = str(user["_id"])
+        log_success(logger, "User found", user_id=user_id)
+
+        # AWS credentials from ENV
+        log_step(logger, "Retrieving AWS credentials from environment")
+        AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+        AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+        AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+        if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+            log_error(logger, ValueError("AWS credentials not set"), "Environment variable check")
+            raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
+        log_success(logger, "AWS credentials retrieved", region=AWS_REGION)
+
+        log_step(logger, "Creating S3 client")
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION
+        )
+
+        # Create bucket name with timestamp
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        bucket_name = f"neo-bucket-{timestamp}"
+        log_step(logger, "Creating S3 bucket", bucket_name=bucket_name, region=AWS_REGION)
+
+        # Create bucket
+        try:
+            if AWS_REGION == "us-east-1":
+                s3.create_bucket(Bucket=bucket_name)
+            else:
+                s3.create_bucket(
+                    Bucket=bucket_name,
+                    CreateBucketConfiguration={"LocationConstraint": AWS_REGION}
+                )
+            log_success(logger, "S3 bucket created", bucket_name=bucket_name)
+        except Exception as e:
+            log_error(logger, e, f"Failed to create S3 bucket: {bucket_name}")
+            raise HTTPException(status_code=500, detail=f"Failed to create bucket: {e}")
+
+        # S3 key: userID/data.filetype
+        s3_key = f"{user_id}/data.{filetype}"
+        log_step(logger, "Uploading file to S3", bucket=bucket_name, s3_key=s3_key)
+
+        try:
+            s3.upload_file(filename, bucket_name, s3_key)
+            log_success(logger, "File uploaded to S3", bucket=bucket_name, s3_key=s3_key)
+        except Exception as e:
+            log_error(logger, e, f"Failed to upload file to S3: {bucket_name}/{s3_key}")
+            raise HTTPException(status_code=500, detail=f"Failed to upload to S3: {e}")
+
+        file_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+        log_api_response(logger, "POST", "/uploadtobucket", status_code=200, bucket_name=bucket_name)
+        return {"msg": "File uploaded successfully", "bucket_name": bucket_name, "file_url": file_url}
+    
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create bucket: {e}")
-
-    # S3 key: userID/data.filetype
-    s3_key = f"{user_id}/data.{filetype}"
-
-    try:
-        s3.upload_file(filename, bucket_name, s3_key)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to S3: {e}")
-
-    file_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
-    return {"msg": "File uploaded successfully", "bucket_name": bucket_name, "file_url": file_url}
+        log_error(logger, e, "During bucket upload")
+        raise HTTPException(status_code=500, detail=f"Failed to upload to bucket: {str(e)}")
 
 # Delete an AWS S3 bucket by name
 @router.delete("/deletebucket")
 def delete_bucket(bucket_name: str = Query(...), current_user: dict = Depends(get_current_user)):
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
-        raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
-
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION
-    )
-
-    # First, delete all objects in the bucket
+    log_api_request(logger, "DELETE", "/deletebucket", bucket_name=bucket_name, username=current_user.get("username"))
+    
     try:
-        # List objects in the bucket
-        objects = s3.list_objects_v2(Bucket=bucket_name)
-        if 'Contents' in objects:
-            for obj in objects['Contents']:
-                s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
-        # Delete the bucket
-        s3.delete_bucket(Bucket=bucket_name)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete bucket: {e}")
+        log_step(logger, "Retrieving AWS credentials from environment")
+        AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+        AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+        AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+        if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+            log_error(logger, ValueError("AWS credentials not set"), "Environment variable check")
+            raise HTTPException(status_code=500, detail="AWS credentials not set in ENV.")
 
-    return {"msg": f"Bucket '{bucket_name}' deleted successfully."}
+        log_step(logger, "Creating S3 client")
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION
+        )
+
+        # First, delete all objects in the bucket
+        log_step(logger, "Listing objects in bucket before deletion", bucket=bucket_name)
+        try:
+            # List objects in the bucket
+            objects = s3.list_objects_v2(Bucket=bucket_name)
+            if 'Contents' in objects:
+                object_count = len(objects['Contents'])
+                log_step(logger, f"Found {object_count} object(s) to delete", bucket=bucket_name)
+                for obj in objects['Contents']:
+                    s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+                log_success(logger, f"Deleted {object_count} object(s) from bucket", bucket=bucket_name)
+            else:
+                log_step(logger, "No objects found in bucket", bucket=bucket_name)
+            
+            # Delete the bucket
+            log_step(logger, "Deleting S3 bucket", bucket=bucket_name)
+            s3.delete_bucket(Bucket=bucket_name)
+            log_success(logger, "S3 bucket deleted successfully", bucket=bucket_name)
+        except Exception as e:
+            log_error(logger, e, f"Failed to delete bucket: {bucket_name}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete bucket: {e}")
+
+        log_api_response(logger, "DELETE", "/deletebucket", status_code=200, bucket_name=bucket_name)
+        return {"msg": f"Bucket '{bucket_name}' deleted successfully."}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(logger, e, "During bucket deletion")
+        raise HTTPException(status_code=500, detail=f"Failed to delete bucket: {str(e)}")

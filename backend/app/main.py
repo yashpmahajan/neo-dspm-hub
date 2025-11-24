@@ -3,9 +3,9 @@ from app.routes import user, generatedata, secretStorage, data_scan
 from app.core import CORS_ORIGINS
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import secretStorage
-from app.logging_config import setup_route_logging
+from app.utils.logging_config import setup_route_logging
 import logging
-from app.logging_config import get_logger
+from app.utils.logging_config import get_logger
 from app.routes import upload_to_env_bucket
 
 # Setup logging for all routes
