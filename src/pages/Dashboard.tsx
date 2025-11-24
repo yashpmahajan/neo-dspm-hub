@@ -462,26 +462,37 @@ const Dashboard = () => {
           className="h-fit"
         >
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="h-6 w-6 text-primary" />
-                      Generate Data
-                    </CardTitle>
-                    <CardDescription className="mt-1.5">
-                      Generate realistic data via LLM.
-                    </CardDescription>
-                  </div>
-                  <ChevronDown
-                    className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
-                      isGenerateExpanded ? 'rotate-180' : ''
-                    }`}
-                  />
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-6 w-6 text-primary" />
+                  Generate Data
+                </CardTitle>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronDown
+                      className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+                        isGenerateExpanded ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+            </CardHeader>
+            {!isGenerateExpanded && (
+              <CardContent>
+                <Button
+                  onClick={() => setIsGenerateExpanded(true)}
+                  className="w-full"
+                >
+                  Generate Data
+                </Button>
+              </CardContent>
+            )}
             <CollapsibleContent>
               <CardContent className="space-y-4 pt-0">
                 {/* Data Type Selection */}
